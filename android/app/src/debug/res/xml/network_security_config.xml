@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG ONLY. Android blocks cleartext HTTP for targetSdk 28+, which includes
+  the emulator's 10.0.2.2 and any LAN address, so local development over plain
+  http:// fails without this.
+
+  base-config rather than a domain list: <domain> matches host names, not CIDR
+  ranges, so a phone on 192.168.x.x could not be expressed as a rule. Safe
+  here because this file lives in src/debug/ and is not merged into release
+  builds, which keep Android's HTTPS-only default.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

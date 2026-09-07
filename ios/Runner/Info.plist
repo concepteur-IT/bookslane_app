@@ -66,5 +66,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Permits plain http:// to hosts on the local network (your Mac running
+	     the API). Narrower than NSAllowsArbitraryLoads: public internet traffic
+	     still has to be HTTPS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- iOS 14+ prompts before an app may reach devices on the local network. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Bookslane connects to a development API running on your local network.</string>
 </dict>
 </plist>

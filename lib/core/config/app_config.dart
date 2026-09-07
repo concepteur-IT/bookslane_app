@@ -50,7 +50,18 @@ class AppConfig {
 
   /// Escape hatch for pointing a build at any host without editing code:
   /// `--dart-define=API_BASE_URL=https://pr-42.api.bookslane.dev`
+  ///
+  /// Wins over everything else, in any environment.
   static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
+
+  /// Dev-only host override — just the host, no scheme or port:
+  /// `--dart-define=DEV_HOST=192.168.1.4`
+  ///
+  /// This is what makes a physical device work. The app cannot discover your
+  /// machine's address by itself (it runs on the phone, not on your Mac), so
+  /// the address is baked in at build time. `scripts/run_dev.sh` fills it in
+  /// automatically from the Mac's current Wi-Fi address.
+  static const String _devHostOverride = String.fromEnvironment('DEV_HOST');
 
   static AppConfig _resolve() {
     final env = AppEnvironment.current;
@@ -89,15 +100,32 @@ class AppConfig {
         : config.copyWith(apiBaseUrl: _baseUrlOverride);
   }
 
-  /// app-api listens on :3002 (APP_API_PORT). An Android emulator reaches the
-  /// host machine through 10.0.2.2 — `localhost` there is the emulator itself.
-  static String get _localApiBaseUrl {
-    const port = 3002;
-    final isAndroidEmulator =
+  /// Port app-api is served on locally — `APP_API_PORT` in bookslane-api,
+  /// which defaults to 3002. (3001 is web-api, the admin panel's `/admin/*`.)
+  static const int _devPort = 3002;
+
+  /// Host for a locally running API, per platform.
+  ///
+  /// | Where the app runs        | Host reaching your Mac |
+  /// |---------------------------|------------------------|
+  /// | Android emulator          | `10.0.2.2`             |
+  /// | iOS simulator, desktop, web | `localhost`          |
+  /// | Physical phone (same Wi-Fi) | your LAN IP          |
+  ///
+  /// An Android emulator is a separate virtual machine: `localhost` there is
+  /// the emulator itself, and 10.0.2.2 is its alias for the host's loopback.
+  /// The iOS simulator shares the Mac's network stack, so `localhost` works.
+  ///
+  /// A real device shares neither, so its address has to be supplied — see
+  /// [_devHostOverride] and `scripts/run_dev.sh`, which fills it in for you.
+  static String get _localApiBaseUrl => 'http://$_devHost:$_devPort';
+
+  static String get _devHost {
+    if (_devHostOverride.isNotEmpty) return _devHostOverride;
+
+    final isAndroid =
         !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-    return isAndroidEmulator
-        ? 'http://10.0.2.2:$port'
-        : 'http://localhost:$port';
+    return isAndroid ? '10.0.2.2' : 'localhost';
   }
 
   AppConfig copyWith({

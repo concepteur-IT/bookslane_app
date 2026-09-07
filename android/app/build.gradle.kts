@@ -6,7 +6,11 @@ plugins {
 
 android {
     namespace = "com.concepteurtechnologies.bookslane_app"
-    compileSdk = flutter.compileSdkVersion
+    // flutter.compileSdkVersion is 36, but flutter_secure_storage 11 requires
+    // callers to compile against 37+. AGP 9.1 warns that 36 is its highest
+    // "recommended" level; compiling against 37 is supported and is what the
+    // plugin's AAR metadata demands.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
