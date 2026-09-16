@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:bookslane_app/core/theme/theme.dart';
+import 'package:bookslane_app/core/widgets/widgets.dart';
+import 'package:bookslane_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
+import 'package:bookslane_app/features/books/presentation/pages/books_hub_page.dart';
+import 'package:bookslane_app/features/dashboard/presentation/widgets/coming_soon_tab.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/dashboard_search_field.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/greeting_banner.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/section_header.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/stat_card.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/visit_card.dart';
+import 'package:bookslane_app/features/dashboard/presentation/widgets/home_tab.dart';
+import 'package:bookslane_app/features/products/presentation/pages/publishings_page.dart';
 import 'package:bookslane_app/features/notifications/presentation/notifications_overlay.dart';
 import 'package:bookslane_app/features/notifications/presentation/widgets/app_notification.dart';
 
-/// Home screen: greeting, headline figures and today's schedule.
+/// The signed-in shell: app bar, the bottom bar, and whichever tab is open.
+///
+/// Tabs are bodies, not routes — the bar stays put while the content swaps,
+/// and each tab keeps its own state.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -20,6 +27,11 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _navIndex = 0;
+
+  /// Null while the Books tab is on its hub; set once a shelf is chosen.
+  /// Keeping it here (rather than pushing a route) is what leaves the bottom
+  /// bar visible on the list, as in the design.
+  BookSource? _bookSource;
 
   // TODO: replace with the notifications feed from the API.
   List<AppNotification> _notifications = const [
@@ -64,12 +76,93 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int get _unreadCount => _notifications.where((n) => !n.isRead).length;
 
-  void _markAllRead() {
+  /// True while a tab is showing an inner page, which brings its own bar.
+  bool get _isInnerPage => _navIndex == 1 && _bookSource != null;
+
+  /// Shown under the app name in the bar.
+  String get _section => switch (_navIndex) {
+    0 => 'Home',
+    1 => 'Books',
+    2 => 'Orders',
+    3 => 'Calendar',
+    _ => 'Profile',
+  };
+
+  Widget get _body => switch (_navIndex) {
+    0 => const HomeTab(),
+    1 => _bookSource == null
+        ? BooksHubPage(
+            onSourceSelected: (source) =>
+                setState(() => _bookSource = source),
+          )
+        // My Publishings is live data from /v1/products; My Store is still
+        // the sample catalogue.
+        : _bookSource == BookSource.publishings
+        ? PublishingsPage(onBack: () => setState(() => _bookSource = null))
+        : BookListPage(
+            // A key per shelf, so switching shelves rebuilds the state
+            // instead of carrying the previous search and page across.
+            key: ValueKey(_bookSource),
+            source: _bookSource!,
+            onBack: () => setState(() => _bookSource = null),
+          ),
+    2 => const ComingSoonTab(
+      title: 'Orders',
+      icon: Icons.receipt_long_outlined,
+    ),
+    3 => const ComingSoonTab(
+      title: 'Calendar',
+      icon: Icons.calendar_today_outlined,
+    ),
+    _ => const ComingSoonTab(
+      title: 'Profile',
+      icon: Icons.person_outline_rounded,
+    ),
+  };
+
+  void _onDestinationSelected(int index) {
     setState(() {
-      _notifications = [
-        for (final n in _notifications) n.copyWith(isRead: true),
-      ];
+      // Tapping Books while already on a shelf goes back to the hub — the
+      // usual "tap the active tab to go up a level".
+      if (index == 1 && _navIndex == 1) {
+        _bookSource = null;
+      }
+      _navIndex = index;
     });
+  }
+
+  /// Confirms, then signs out.
+  ///
+  /// No navigation afterwards: AuthProvider flips to unauthenticated and
+  /// AuthGate replaces this screen with the sign-in page.
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to sign in again to continue.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.ctaBackground,
+            ),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout != true || !mounted) return;
+
+    await context.read<AuthProvider>().logout();
+
+    if (!mounted) return;
+    AppToast.success(context, 'You have been logged out.');
   }
 
   Future<void> _openNotifications() {
@@ -87,88 +180,33 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // TODO: replace with data from the API once the endpoints exist.
-  static const _visits = <Visit>[
-    Visit(
-      store: 'City Gross Malmö',
-      timeRange: '09:00 - 10:30',
-      address: 'Hyllie Blvd 12',
-      status: VisitStatus.done,
-    ),
-    Visit(
-      store: 'ICA Maxi Lund',
-      timeRange: '11:00 - 12:00',
-      address: 'St Lars väg 8',
-      status: VisitStatus.active,
-    ),
-    Visit(
-      store: 'Coop Forum',
-      timeRange: '13:30 - 14:30',
-      address: 'Mobilia, Malmö',
-      status: VisitStatus.upcoming,
-    ),
-    Visit(
-      store: 'Willys Svedala',
-      timeRange: '15:00 - 16:00',
-      address: 'Industrivägen 4',
-      status: VisitStatus.upcoming,
-    ),
-  ];
+  void _markAllRead() {
+    setState(() {
+      _notifications = [
+        for (final n in _notifications) n.copyWith(isRead: true),
+      ];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.screenBackground,
-      appBar: DashboardAppBar(
-        section: 'Home',
-        notificationCount: _unreadCount,
-        onNotificationsPressed: _openNotifications,
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.xl,
-          ),
-          children: [
-            const DashboardSearchField(),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const GreetingBanner(
-              greeting: 'Good morning, Anna',
-              headline: 'You have 4 visits today',
-              note: 'Performance up 12% this week',
+      // Inner pages (a shelf, later an order) supply their own bar with a
+      // back button and their own actions — the branded one would just cost a
+      // row of height.
+      appBar: _isInnerPage
+          ? null
+          : DashboardAppBar(
+              section: _section,
+              notificationCount: _unreadCount,
+              onNotificationsPressed: _openNotifications,
+              onLogoutPressed: _confirmLogout,
             ),
-
-            const SizedBox(height: AppSpacing.lg),
-
-            const _StatsRow(),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            SectionHeader(
-              title: "Today's visits",
-              actionLabel: 'See all',
-              onActionPressed: () {},
-            ),
-
-            const SizedBox(height: AppSpacing.sm),
-
-            // Non-scrolling: the page itself is the scroll view.
-            for (final visit in _visits) ...[
-              VisitCard(visit: visit, onTap: () {}),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-          ],
-        ),
-      ),
+      body: SafeArea(top: false, child: _body),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
-        onDestinationSelected: (index) => setState(() => _navIndex = index),
+        onDestinationSelected: _onDestinationSelected,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -176,9 +214,9 @@ class _DashboardPageState extends State<DashboardPage> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.widgets_outlined),
-            selectedIcon: Icon(Icons.widgets_rounded),
-            label: 'Products',
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book_rounded),
+            label: 'Books',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
@@ -194,49 +232,6 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Icon(Icons.person_outline_rounded),
             selectedIcon: Icon(Icons.person_rounded),
             label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The three headline figures. Equal widths, so they stay aligned whatever the
-/// numbers are.
-class _StatsRow extends StatelessWidget {
-  const _StatsRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: StatCard(
-              icon: Icons.shopping_bag_outlined,
-              iconColor: AppColors.brandPrimary,
-              value: '128',
-              label: 'Orders',
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: StatCard(
-              icon: Icons.inventory_2_outlined,
-              iconColor: AppColors.ctaBackground,
-              value: '1,248',
-              label: 'Products',
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: StatCard(
-              icon: Icons.account_balance_wallet_outlined,
-              iconColor: AppColors.warningText,
-              value: '84.3k',
-              label: 'Revenue',
-            ),
           ),
         ],
       ),

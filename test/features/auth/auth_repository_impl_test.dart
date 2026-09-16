@@ -7,6 +7,7 @@ import 'package:bookslane_app/core/storage/token_storage.dart';
 import 'package:bookslane_app/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:bookslane_app/features/auth/data/models/login_response.dart';
 import 'package:bookslane_app/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:bookslane_app/features/auth/domain/entities/auth_failure.dart';
 import 'package:bookslane_app/features/auth/domain/entities/user.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -131,15 +132,32 @@ void main() {
       });
     });
 
-    test('does not store anything when the API rejects the credentials',
-        () async {
+    test('maps a 401 to a friendly failure and stores nothing', () async {
       final t = build({'message': 'Invalid credentials'}, status: 401);
 
       await expectLater(
         t.repo.login(email: 'anna@bookslane.com', password: 'wrong'),
-        throwsA(isA<DioException>()),
+        throwsA(
+          isA<AuthFailure>()
+              .having((f) => f.kind, 'kind',
+                  AuthFailureKind.invalidCredentials)
+              .having((f) => f.message, 'message',
+                  'Incorrect email or password.'),
+        ),
       );
       expect(t.store.access, isNull);
+    });
+
+    test('maps a 500 to a server failure', () async {
+      final t = build({'message': 'boom'}, status: 500);
+
+      await expectLater(
+        t.repo.login(email: 'anna@bookslane.com', password: 'hunter2'),
+        throwsA(
+          isA<AuthFailure>()
+              .having((f) => f.kind, 'kind', AuthFailureKind.server),
+        ),
+      );
     });
   });
 

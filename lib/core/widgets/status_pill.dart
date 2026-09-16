@@ -18,15 +18,15 @@ class StatusPill extends StatelessWidget {
     return Container(
       decoration: AppDecorations.statusPill(color),
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
+        horizontal: AppSpacing.xs + 2,
+        vertical: AppSpacing.xxs + 2,
       ),
       child: Text(
         label,
         style: AppTypography.caption.copyWith(
           color: AppColors.inverseText,
           fontWeight: FontWeight.w700,
-          fontSize: 14,
+          fontSize: 13,
         ),
       ),
     );

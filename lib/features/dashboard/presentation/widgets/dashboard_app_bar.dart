@@ -10,12 +10,16 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.section,
     this.notificationCount = 0,
     this.onNotificationsPressed,
+    this.onLogoutPressed,
   });
 
   /// Shown under the app name — "Home", "Orders", ...
   final String section;
   final int notificationCount;
   final VoidCallback? onNotificationsPressed;
+
+  /// Shows a sign-out button when provided.
+  final VoidCallback? onLogoutPressed;
 
   /// Also the offset the notifications dropdown hangs from.
   static const double height = 72;
@@ -47,12 +51,23 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Both single-line: a long section name ("My
+                      // Publishings") would otherwise wrap and overflow the
+                      // fixed-height bar.
                       Text(
                         AppConstants.appName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTypography.titleLarge,
                       ),
-                      Text(section, style: AppTypography.bodyMedium),
+                      Text(
+                        section,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodyMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -61,6 +76,17 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                   count: notificationCount,
                   onPressed: onNotificationsPressed,
                 ),
+
+                if (onLogoutPressed != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    onPressed: onLogoutPressed,
+                    tooltip: 'Log out',
+                    icon: const Icon(Icons.logout_rounded),
+                    color: AppColors.iconPrimary,
+                    iconSize: AppSizes.iconLg,
+                  ),
+                ],
               ],
             ),
           ),

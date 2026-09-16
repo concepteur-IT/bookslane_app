@@ -1,112 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/config/config.dart';
+import 'package:bookslane_app/core/network/api_client.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
-import 'package:bookslane_app/features/splash/presentation/pages/splash_page.dart';
+import 'package:bookslane_app/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:bookslane_app/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:bookslane_app/features/auth/domain/repositories/auth_repository.dart';
+import 'package:bookslane_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:bookslane_app/features/auth/presentation/widgets/auth_gate.dart';
+import 'package:bookslane_app/features/products/data/datasources/products_remote_datasource.dart';
+import 'package:bookslane_app/features/products/data/repositories/products_repository_impl.dart';
+import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
 
 void main() {
   runApp(const BooksLane());
 }
 
-class BooksLane extends StatelessWidget {
+class BooksLane extends StatefulWidget {
   const BooksLane({super.key});
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Bookslane',
-      debugShowCheckedModeBanner: false,
-      // Every colour, type style, radius and motion token lives in
-      // lib/core/theme - never style a widget with a raw value.
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.light,
-      home: const SplashPage(),
-    );
-  }
+  State<BooksLane> createState() => _BooksLaneState();
 }
 
-class BooksLaneHomePage extends StatefulWidget {
-  const BooksLaneHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class _BooksLaneState extends State<BooksLane> {
+  late final AuthProvider _authProvider;
+  late final ApiClient _apiClient;
+  late final ProductsRepository _productsRepository;
 
   @override
-  State<BooksLaneHomePage> createState() => _BooksLaneHomePageState();
-}
+  void initState() {
+    super.initState();
 
-class _BooksLaneHomePageState extends State<BooksLaneHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
+    // Built once for the life of the app: each ApiClient carries its own Dio
+    // and connection pool.
     //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    // onSessionExpired fires when a token refresh fails mid-session. It flips
+    // the provider, and AuthGate swaps to the login screen from wherever the
+    // user happened to be.
+    _apiClient = ApiClient(
+      onSessionExpired: () => _authProvider.onSessionExpired(),
+    );
+
+    final AuthRepository repository = AuthRepositoryImpl(
+      remoteDataSource: AuthRemoteDataSource(apiClient: _apiClient),
+      tokenStorage: _apiClient.storage,
+    );
+
+    // Shares the one ApiClient, so products ride the same bearer token and
+    // refresh handling as everything else.
+    _productsRepository = ProductsRepositoryImpl(
+      remoteDataSource: ProductsRemoteDataSource(apiClient: _apiClient),
+    );
+
+    _authProvider = AuthProvider(repository);
+    // Checks the stored token; the splash stays up until it answers.
+    _authProvider.bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _authProvider.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
+        Provider<ProductsRepository>.value(value: _productsRepository),
+      ],
+      child: MaterialApp(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        // Every colour, type style, radius and motion token lives in
+        // lib/core/theme - never style a widget with a raw value.
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.light,
+        // Not a fixed home screen: the gate derives it from the auth status.
+        home: const AuthGate(),
       ),
     );
   }

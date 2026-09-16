@@ -1,52 +1,16 @@
-import 'dart:async';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:bookslane_app/core/config/config.dart';
-import 'package:bookslane_app/features/auth/presentation/pages/login_page.dart';
+import 'package:bookslane_app/core/theme/theme.dart';
 
-class SplashPage extends StatefulWidget {
+/// Brand screen shown while the app works out whether anyone is signed in.
+///
+/// It no longer navigates anywhere itself: [AuthGate] shows it for exactly as
+/// long as `AuthProvider.status` is `unknown`, which removes the old race
+/// between a fixed timer and however long the session check actually takes.
+class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
-
-  @override
-  State<SplashPage> createState() => _SplashPageState();
-}
-
-class _SplashPageState extends State<SplashPage> {
-  static const _splashDuration = Duration(seconds: 2);
-
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Start counting only once the splash has actually been painted. initState
-    // runs well before the first frame is rasterized, and Android holds the
-    // native launch screen until that frame lands - on a cold debug start that
-    // gap can exceed 2s, so timing from here would skip the splash entirely.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _timer = Timer(_splashDuration, _openLogin);
-    });
-  }
-
-  @override
-  void dispose() {
-    // Stop the timer if the page is torn down early, so it can't fire a
-    // navigation against a disposed State.
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _openLogin() {
-    if (!mounted) return;
-
-    // pushReplacement so the back button doesn't return to the splash screen.
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const LoginPage()),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +32,7 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     return const Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceBackground,
       body: _SplashContent(),
     );
   }
@@ -90,14 +54,12 @@ class _SplashContent extends StatelessWidget {
             fit: BoxFit.contain,
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.lg),
 
-          const Text(
+          Text(
             'Your book, your business',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color.fromARGB(255, 1, 0, 0),
+            style: AppTypography.headlineLarge.copyWith(
+              color: AppColors.ctaBackground,
             ),
           ),
         ],

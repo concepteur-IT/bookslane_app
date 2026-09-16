@@ -14,6 +14,7 @@ class LoginForm extends StatefulWidget {
     super.key,
     this.onSubmit,
     this.onForgotPassword,
+    this.isSubmitting = false,
     // this.onCreateAccount,
   });
 
@@ -22,6 +23,9 @@ class LoginForm extends StatefulWidget {
   final void Function(String email, String password)? onSubmit;
 
   final VoidCallback? onForgotPassword;
+
+  /// While true the button shows a spinner and stops accepting taps.
+  final bool isSubmitting;
   // final VoidCallback? onCreateAccount;
 
   @override
@@ -48,6 +52,10 @@ class _LoginFormState extends State<LoginForm> {
     // Dismiss the keyboard first so validation errors aren't hidden behind it.
     FocusScope.of(context).unfocus();
 
+    if (widget.isSubmitting) return;
+
+    // Client-side validation runs first, so an obviously bad email never
+    // becomes a network round trip.
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     widget.onSubmit?.call(
@@ -143,6 +151,7 @@ class _LoginFormState extends State<LoginForm> {
             CtaButton(
               label: 'SIGN IN',
               icon: Icons.arrow_forward_rounded,
+              isLoading: widget.isSubmitting,
               onPressed: _submit,
             ),
 

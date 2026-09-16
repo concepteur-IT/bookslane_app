@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:bookslane_app/core/theme/theme.dart';
 
-/// Search box at the top of the dashboard.
+/// Search box used at the top of list screens.
 ///
 /// Sits on the grey page canvas, so it overrides the theme's grey input fill
 /// with the card surface to stay legible.
-class DashboardSearchField extends StatelessWidget {
-  const DashboardSearchField({
+class AppSearchField extends StatelessWidget {
+  const AppSearchField({
     super.key,
     this.controller,
     this.onChanged,

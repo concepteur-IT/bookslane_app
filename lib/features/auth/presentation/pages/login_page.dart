@@ -1,14 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:bookslane_app/core/config/config.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
+import 'package:bookslane_app/core/widgets/widgets.dart';
+import 'package:bookslane_app/features/auth/domain/entities/auth_failure.dart';
+import 'package:bookslane_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bookslane_app/features/auth/presentation/widgets/login_form.dart';
-import 'package:bookslane_app/features/dashboard/presentation/pages/dashboard_page.dart';
 
 /// Sign-in screen: purple brand header with the logo, and a white sheet
 /// carrying the form.
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
+
+  /// Runs the sign-in.
+  ///
+  /// On success nothing navigates here — [AuthProvider] flips to
+  /// authenticated and `AuthGate` swaps the screen. On failure the message
+  /// comes back as an [AuthFailure] and goes straight into a toast.
+  Future<void> _signIn(
+    BuildContext context,
+    String email,
+    String password,
+  ) async {
+    try {
+      await context.read<AuthProvider>().login(
+        email: email,
+        password: password,
+      );
+    } on AuthFailure catch (failure) {
+      if (!context.mounted) return;
+      AppToast.error(context, failure.message);
+    } catch (_) {
+      // Nothing should reach here — the repository maps everything to
+      // AuthFailure — but a crash on the sign-in screen would trap the user.
+      if (!context.mounted) return;
+      AppToast.error(context, 'Something went wrong. Please try again.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,14 +71,11 @@ class LoginPage extends StatelessWidget {
                           Expanded(
                             child: _FormSheet(
                               child: LoginForm(
-                                // TODO: authenticate against the API before
-                                // routing; this only proves the flow works.
+                                isSubmitting: context.select<AuthProvider, bool>(
+                                  (auth) => auth.isSubmitting,
+                                ),
                                 onSubmit: (email, password) =>
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => const DashboardPage(),
-                                      ),
-                                    ),
+                                    _signIn(context, email, password),
                                 onForgotPassword: () {},
                                 // onCreateAccount: () {},
                               ),
