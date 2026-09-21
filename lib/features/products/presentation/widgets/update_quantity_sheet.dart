@@ -23,9 +23,14 @@ Future<int?> showUpdateQuantitySheet({
     builder: (sheetContext) => Padding(
       // Lifts the sheet above the keyboard.
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
       ),
-      child: _UpdateQuantityForm(product: product, onSubmit: onSubmit),
+      // Scrollable, because what's left above the keyboard can be shorter
+      // than the form — on a small phone, much shorter. Without this the
+      // buttons are clipped and untappable (silently, in a release build).
+      child: SingleChildScrollView(
+        child: _UpdateQuantityForm(product: product, onSubmit: onSubmit),
+      ),
     ),
   );
 }

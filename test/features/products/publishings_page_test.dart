@@ -219,6 +219,40 @@ void main() {
     expect(find.byType(ProductCard), findsOneWidget);
   });
 
+  testWidgets('the form fits above the keyboard on a short screen',
+      (tester) async {
+    // A small phone — 360x640, smaller than the device this was first seen on.
+    tester.view.physicalSize = const Size(360 * 3, 640 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      Provider<ProductsRepository>.value(
+        value: FakeProductsRepository(),
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const Scaffold(body: PublishingsPage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Edit quantity'));
+    await tester.pumpAndSettle();
+    expect(find.text('Update quantity'), findsOneWidget);
+
+    // The keyboard comes up: half the screen disappears under it.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320 * 3);
+    await tester.pumpAndSettle();
+
+    // No RenderFlex overflow, and the form still works.
+    expect(tester.takeException(), isNull);
+    await tester.enterText(find.byType(TextFormField), '25');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('37'), findsOneWidget); // the preview still updates
+  });
+
   testWidgets('filtering refetches from the server', (tester) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:bookslane_app/core/theme/theme.dart';
 
@@ -17,8 +18,11 @@ class AppTextField extends StatelessWidget {
     this.suffixIcon,
     this.obscureText = false,
     this.enabled = true,
+    this.maxLines = 1,
     this.keyboardType,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters,
     this.autofillHints,
     this.validator,
     this.onFieldSubmitted,
@@ -31,8 +35,17 @@ class AppTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final bool obscureText;
   final bool enabled;
+
+  /// Multi-line fields (a description, an address) pass a larger value. Must
+  /// stay 1 when [obscureText] is true — Flutter asserts on that pair.
+  final int maxLines;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+
+  /// Keeps unwanted characters out of numeric fields, so a price field never
+  /// has to reject what it could have refused to accept.
+  final List<TextInputFormatter>? inputFormatters;
   final Iterable<String>? autofillHints;
   final FormFieldValidator<String>? validator;
   final ValueChanged<String>? onFieldSubmitted;
@@ -44,8 +57,11 @@ class AppTextField extends StatelessWidget {
       focusNode: focusNode,
       obscureText: obscureText,
       enabled: enabled,
+      maxLines: maxLines,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
       autofillHints: autofillHints,
       validator: validator,
       onFieldSubmitted: onFieldSubmitted,
@@ -54,10 +70,13 @@ class AppTextField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         // Icon colours are left to the theme's prefix/suffix icon colours.
+        // A multi-line field grows downwards, so its icon is pinned to the
+        // first line instead of drifting to the vertical centre.
         prefixIcon: Padding(
-          padding: const EdgeInsets.only(
+          padding: EdgeInsets.only(
             left: AppSpacing.md,
             right: AppSpacing.sm,
+            bottom: maxLines > 1 ? AppSpacing.lg : 0,
           ),
           child: Icon(prefixIcon, size: AppSizes.iconMd),
         ),

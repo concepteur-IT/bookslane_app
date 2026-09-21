@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/sample_books.dart';
+import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_card.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_filter_bar.dart';
+import 'package:bookslane_app/features/books/presentation/widgets/add_book.dart';
 
 /// The list behind both hub buttons — same screen, different [source].
 ///
-/// Search, filter, sort and paging all run in memory over [SampleBooks]. When
-/// `/v1/books` exists they become query parameters and this keeps its shape.
+/// Search, filter, sort and paging still run in memory over [SampleBooks] —
+/// `GET /v1/books` isn't wired up yet, only the create side is (see
+/// [_addBook]). A book added through the sheet is inserted at the top of this
+/// same in-memory list, so it's visible immediately even though the rest of
+/// the list is still sample data.
 class BookListPage extends StatefulWidget {
   const BookListPage({super.key, required this.source, this.onBack});
 
@@ -75,6 +82,50 @@ class _BookListPageState extends State<BookListPage> {
     );
   }
 
+  /// Opens the Add Book sheet, creates the book through `POST /v1/books`
+  /// while the sheet is still up, and puts what the API returns at the top of
+  /// the list.
+  ///
+  /// The sheet resolves to null when it is dismissed without submitting —
+  /// including when the create call fails, since [AddBookForm] only pops once
+  /// [onSubmit] succeeds — so null is always "nothing happened", never "it
+  /// happened but we don't know the result".
+  Future<void> _addBook() async {
+    final booksRepository = context.read<BooksRepository>();
+
+    final draft = await AddBookForm.show(
+      context,
+      source: widget.source,
+      onSubmit: (draft) async {
+        try {
+          final book = await booksRepository.createBook(draft);
+          if (!mounted) return;
+
+          setState(() {
+            _books = [book, ..._books];
+
+            // A book you just added has to be on screen. Left on a Price
+            // sort, an Inactive filter or page 3, it would save successfully
+            // and appear to have vanished.
+            _sort = BookSort.newest;
+            _filter = BookFilter.all;
+            _resetPage();
+          });
+        } on ApiFailure catch (failure) {
+          if (mounted) AppToast.error(context, failure.message);
+          rethrow; // keeps the sheet open with every field intact
+        }
+      },
+    );
+
+    if (draft == null || !mounted) return;
+
+    AppToast.success(
+      context,
+      '${draft.title} added to ${widget.source.label}.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final matching = _matching;
@@ -84,15 +135,12 @@ class _BookListPageState extends State<BookListPage> {
       backgroundColor: AppColors.screenBackground,
       appBar: InnerPageAppBar(
         title: widget.source.label,
-        subtitle: '${matching.length} titles',
+        subtitle: '${matching.length} books',
         onBack: widget.onBack,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: _AddButton(
-              onPressed: () =>
-                  AppToast.info(context, 'Adding a book is not built yet.'),
-            ),
+            child: _AddButton(onPressed: _addBook),
           ),
         ],
         searchField: AppSearchField(

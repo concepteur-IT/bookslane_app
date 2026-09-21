@@ -77,5 +77,10 @@
 	<!-- iOS 14+ prompts before an app may reach devices on the local network. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Bookslane connects to a development API running on your local network.</string>
+	<!-- image_picker: the cover-image field on the Add Book form. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Bookslane needs access to your photos so you can pick a cover image for a book.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bookslane needs access to your camera so you can photograph a book cover.</string>
 </dict>
 </plist>

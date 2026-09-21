@@ -18,7 +18,9 @@ abstract final class ApiEndpoints {
   static const String logout = '/auth/logout';
   static const String me = '/auth/me';
 
-  // Add new groups as their controllers land, e.g.
-  // static const String books = '/books';
-  // static String book(String id) => '/books/$id';
+  // ---------------------------------------------------------------------------
+  // Books — app-api/src/books/books.controller.ts
+  // ---------------------------------------------------------------------------
+  static const String books = '/books';
+  static String book(String id) => '/books/$id';
 }
