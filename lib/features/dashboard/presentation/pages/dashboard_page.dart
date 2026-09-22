@@ -95,8 +95,8 @@ class _DashboardPageState extends State<DashboardPage> {
             onSourceSelected: (source) =>
                 setState(() => _bookSource = source),
           )
-        // My Publishings is live data from /v1/products; My Store is still
-        // the sample catalogue.
+        // My Publishings is live data from /v1/products; My Store is live
+        // data from /v1/books (see BooksProvider).
         : _bookSource == BookSource.publishings
         ? PublishingsPage(onBack: () => setState(() => _bookSource = null))
         : BookListPage(

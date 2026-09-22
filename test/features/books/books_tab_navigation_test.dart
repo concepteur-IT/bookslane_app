@@ -2,6 +2,9 @@ import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/auth/domain/entities/user.dart';
 import 'package:bookslane_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:bookslane_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
+import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
 import 'package:bookslane_app/features/books/presentation/pages/books_hub_page.dart';
 import 'package:bookslane_app/features/dashboard/presentation/pages/dashboard_page.dart';
@@ -59,6 +62,32 @@ class _StubProducts implements ProductsRepository {
   }) async => throw UnimplementedError();
 }
 
+/// My Store talks to /v1/books, so the shell needs this one too.
+class _StubBooks implements BooksRepository {
+  @override
+  Future<BookPage> fetchBooks({
+    required int page,
+    int limit = 10,
+    String? search,
+    BookFilter filter = BookFilter.all,
+    BookSort sort = BookSort.newest,
+  }) async => const BookPage(
+    items: [],
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+  );
+
+  @override
+  Future<Book> createBook(BookDraft draft) async => throw UnimplementedError();
+
+  @override
+  Future<Book> setActive({required String id, required bool isActive}) async =>
+      throw UnimplementedError();
+}
+
 void main() {
   Future<void> pumpShell(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390 * 3, 1400 * 3);
@@ -72,6 +101,7 @@ void main() {
             create: (_) => AuthProvider(_StubRepo())..bootstrap(),
           ),
           Provider<ProductsRepository>(create: (_) => _StubProducts()),
+          Provider<BooksRepository>(create: (_) => _StubBooks()),
         ],
         child: MaterialApp(theme: AppTheme.light, home: const DashboardPage()),
       ),

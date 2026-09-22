@@ -40,13 +40,17 @@ void main() {
     });
   });
 
+  // My Store is now real data (GET /v1/books) — see BooksProvider and
+  // book_list_page.dart. My Publishings is still the shelf that runs over
+  // SampleBooks in memory, so this whole group exercises that machinery
+  // through BookSource.publishings instead of a live network call.
   group('list', () {
     testWidgets('shows the first page of the chosen shelf', (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
 
-      expect(find.text('My Store'), findsOneWidget);
+      expect(find.text('My Publishings'), findsOneWidget);
       expect(find.byType(BookCard), findsNWidgets(6)); // page size
-      expect(find.text('6 of ${SampleBooks.store.length}'), findsOneWidget);
+      expect(find.text('6 of ${SampleBooks.publishings.length}'), findsOneWidget);
       expect(find.text('1/2'), findsOneWidget);
     });
 
@@ -59,20 +63,20 @@ void main() {
     });
 
     testWidgets('paging forward shows the rest', (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
-      expect(find.text('Travel Journal'), findsOneWidget);
+      await pump(tester, const BookListPage(source: BookSource.publishings));
+      expect(find.text('The Malmö Letters'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Next page'));
       await tester.pumpAndSettle();
 
       expect(find.text('2/2'), findsOneWidget);
-      expect(find.text('Travel Journal'), findsNothing);
-      expect(find.text('Sticker Book'), findsOneWidget);
+      expect(find.text('The Malmö Letters'), findsNothing);
+      expect(find.text('First Words'), findsOneWidget);
     });
 
     testWidgets('filtering narrows the list and resets to page one',
         (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
       await tester.tap(find.byTooltip('Next page'));
       await tester.pumpAndSettle();
       expect(find.text('2/2'), findsOneWidget);
@@ -86,25 +90,25 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final inactive = SampleBooks.store.where((b) => !b.isActive).length;
+      final inactive = SampleBooks.publishings.where((b) => !b.isActive).length;
       expect(find.byType(BookCard), findsNWidgets(inactive));
       expect(find.text('$inactive of $inactive'), findsOneWidget);
       expect(find.text('1/1'), findsOneWidget, reason: 'must reset the page');
     });
 
     testWidgets('search matches title and subtitle', (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
 
-      await tester.enterText(find.byType(AppSearchField), 'vegetables');
+      await tester.enterText(find.byType(AppSearchField), 'seafood');
       await tester.pumpAndSettle();
 
       expect(find.byType(BookCard), findsOneWidget);
-      expect(find.text('Gardening Basics'), findsOneWidget);
+      expect(find.text('Coastal Recipes'), findsOneWidget);
     });
 
     testWidgets('a search with no matches shows the empty state',
         (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
 
       await tester.enterText(find.byType(AppSearchField), 'zzzz');
       await tester.pumpAndSettle();
@@ -114,7 +118,7 @@ void main() {
     });
 
     testWidgets('sorting by name reorders the page', (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
 
       await tester.tap(
         find.descendant(
@@ -131,18 +135,19 @@ void main() {
       final sorted = [...titles]
         ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
       expect(titles, sorted);
-      expect(titles.first, 'Atlas of the World');
+      expect(titles.first, 'Building Bookslane');
     });
 
     testWidgets('the dot toggles active state', (tester) async {
-      await pump(tester, const BookListPage(source: BookSource.store));
+      await pump(tester, const BookListPage(source: BookSource.publishings));
 
-      // Travel Journal is inactive to begin with.
+      // Winter Light is inactive to begin with, and the only inactive title
+      // on the first page.
       expect(find.byTooltip('Activate'), findsWidgets);
       await tester.tap(find.byTooltip('Activate').first);
       await tester.pumpAndSettle();
 
-      expect(find.text('Travel Journal is now active.'), findsOneWidget);
+      expect(find.text('Winter Light is now active.'), findsOneWidget);
     });
 
     testWidgets('back returns to the hub', (tester) async {
@@ -150,7 +155,7 @@ void main() {
       await pump(
         tester,
         BookListPage(
-          source: BookSource.store,
+          source: BookSource.publishings,
           onBack: () => wentBack = true,
         ),
       );

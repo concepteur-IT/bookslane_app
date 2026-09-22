@@ -40,19 +40,7 @@ class BookCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: AppSizes.tileMd,
-                height: AppSizes.tileMd,
-                decoration: const BoxDecoration(
-                  color: AppColors.brandSoftBackground,
-                  borderRadius: AppRadius.mdAll,
-                ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  size: AppSizes.iconLg,
-                  color: AppColors.brandPrimary,
-                ),
-              ),
+              _Cover(imageUrl: book.imageUrl),
 
               const SizedBox(width: AppSpacing.sm),
 
@@ -132,6 +120,41 @@ class BookCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The cover image, falling back to the book icon when there is none — every
+/// sample book (My Publishings) — or it fails to load. See ProductCard's
+/// `_Cover` for the same shape.
+class _Cover extends StatelessWidget {
+  const _Cover({this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: AppSizes.tileMd,
+      height: AppSizes.tileMd,
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(
+        color: AppColors.brandSoftBackground,
+        borderRadius: AppRadius.mdAll,
+      ),
+      child: imageUrl == null
+          ? _placeholder
+          : Image.network(
+              imageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _placeholder,
+            ),
+    );
+  }
+
+  static Widget get _placeholder => Icon(
+    Icons.inventory_2_outlined,
+    size: AppSizes.iconLg,
+    color: AppColors.brandPrimary,
+  );
 }
 
 /// "23 in stock" — grey, or red once nothing is left.

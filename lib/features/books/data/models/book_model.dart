@@ -59,6 +59,7 @@ class BookModel {
     stock: quantity,
     isActive: isActive,
     addedOn: createdAt,
+    imageUrl: imageUrl,
   );
 
   // ---------------------------------------------------------------------------
@@ -80,4 +81,39 @@ class BookModel {
   }
 
   static String asString(Object? value) => value?.toString() ?? '';
+}
+
+/// Wire format of `BookListResponseDto` — `data` plus the `pagination` block.
+/// See [ProductPageModel] for the same shape.
+class BookPageModel {
+  const BookPageModel({required this.items, required this.pagination});
+
+  final List<BookModel> items;
+  final Map<String, dynamic> pagination;
+
+  factory BookPageModel.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is! List) {
+      throw const FormatException('Book list is missing "data".');
+    }
+
+    return BookPageModel(
+      items: [
+        for (final row in data)
+          if (row is Map<String, dynamic>) BookModel.fromJson(row),
+      ],
+      pagination: json['pagination'] is Map<String, dynamic>
+          ? json['pagination'] as Map<String, dynamic>
+          : const {},
+    );
+  }
+
+  BookPage toEntity() => BookPage(
+    items: [for (final item in items) item.toEntity()],
+    page: BookModel.asInt(pagination['page']),
+    limit: BookModel.asInt(pagination['limit']),
+    total: BookModel.asInt(pagination['total']),
+    totalPages: BookModel.asInt(pagination['total_pages']),
+    hasNext: pagination['has_next'] == true,
+  );
 }

@@ -17,6 +17,32 @@ class BooksRepositoryImpl implements BooksRepository {
   final BooksRemoteDataSource remoteDataSource;
 
   @override
+  Future<BookPage> fetchBooks({
+    required int page,
+    int limit = 10,
+    String? search,
+    BookFilter filter = BookFilter.all,
+    BookSort sort = BookSort.newest,
+  }) async {
+    try {
+      final result = await remoteDataSource.list(
+        page: page,
+        limit: limit,
+        search: search,
+        filter: filter,
+        sort: sort,
+      );
+      return result.toEntity();
+    } on DioException catch (error) {
+      throw mapDioException(error);
+    } on FormatException {
+      throw const ApiFailure(
+        'The server sent something unexpected. Please try again.',
+      );
+    }
+  }
+
+  @override
   Future<Book> createBook(BookDraft draft) async {
     try {
       final result = await remoteDataSource.create(draft);
@@ -25,6 +51,20 @@ class BooksRepositoryImpl implements BooksRepository {
       // app-api's message is already written for a person here (e.g.
       // "You already have a book with that SKU." for SKU_ALREADY_EXISTS), so
       // there's no per-code override to make, unlike ProductsRepositoryImpl.
+      throw mapDioException(error);
+    } on FormatException {
+      throw const ApiFailure(
+        'The server sent something unexpected. Please try again.',
+      );
+    }
+  }
+
+  @override
+  Future<Book> setActive({required String id, required bool isActive}) async {
+    try {
+      final result = await remoteDataSource.updateActive(id: id, isActive: isActive);
+      return result.toEntity();
+    } on DioException catch (error) {
       throw mapDioException(error);
     } on FormatException {
       throw const ApiFailure(

@@ -14,13 +14,36 @@ import 'package:bookslane_app/features/books/domain/repositories/books_repositor
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_card.dart';
 
-/// Stands in for `POST /v1/books` — returns a [Book] shaped the way
-/// [BookModel.toEntity] would, without a server.
+/// Stands in for `/v1/books` — an in-memory list, shaped the way
+/// [BookModel.toEntity] would produce it, without a server. [BooksProvider]
+/// calls [fetchBooks] itself (on load, and again after every [createBook]),
+/// so this has to actually hold state rather than just answer `createBook`.
 class _FakeBooksRepository implements BooksRepository {
+  final List<Book> _books = [];
+  int _nextId = 1;
+
+  @override
+  Future<BookPage> fetchBooks({
+    required int page,
+    int limit = 10,
+    String? search,
+    BookFilter filter = BookFilter.all,
+    BookSort sort = BookSort.newest,
+  }) async {
+    return BookPage(
+      items: List.of(_books),
+      page: 1,
+      limit: limit,
+      total: _books.length,
+      totalPages: 1,
+      hasNext: false,
+    );
+  }
+
   @override
   Future<Book> createBook(BookDraft draft) async {
-    return Book(
-      id: 'fake-1',
+    final book = Book(
+      id: 'fake-${_nextId++}',
       title: draft.title,
       // Same fallback BookModel.toEntity applies for a real response.
       subtitle: draft.subtitle.isNotEmpty ? draft.subtitle : draft.author,
@@ -29,6 +52,16 @@ class _FakeBooksRepository implements BooksRepository {
       isActive: draft.status == BookStatus.active,
       addedOn: DateTime.now(),
     );
+    _books.insert(0, book);
+    return book;
+  }
+
+  @override
+  Future<Book> setActive({required String id, required bool isActive}) async {
+    final index = _books.indexWhere((book) => book.id == id);
+    final updated = _books[index].copyWith(isActive: isActive);
+    _books[index] = updated;
+    return updated;
   }
 }
 
