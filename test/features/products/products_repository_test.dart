@@ -114,7 +114,12 @@ Map<String, dynamic> listJson(
     'has_next': hasNext,
   },
   'publishers': [
-    {'id': 9, 'name': 'Thinkerslane', 'slug': 'thinkerslane', 'discount_rate': 10},
+    {
+      'id': 9,
+      'name': 'Thinkerslane',
+      'slug': 'thinkerslane',
+      'discount_rate': 10,
+    },
   ],
 };
 
@@ -161,8 +166,12 @@ void main() {
         page: 2,
         limit: 10,
         search: '  tagore  ',
-        filter: ProductFilter.inactive,
-        sort: ProductSort.quantity,
+        filters: const ProductFilters(
+          isActive: false,
+          inStockOnly: true,
+          category: ProductCategory(id: 1001, name: 'Poem'),
+        ),
+        sort: ProductSort.titleDesc,
       );
 
       final query = t.adapter.requests.single.queryParameters;
@@ -170,11 +179,56 @@ void main() {
       expect(query['limit'], 10);
       expect(query['search'], 'tagore'); // trimmed
       expect(query['is_active'], 0);
-      expect(query['sort'], 'stock');
+      expect(query['in_stock'], 1);
+      expect(query['category_id'], 1001);
+      expect(query['sort'], 'name');
       expect(query['order'], 'DESC');
     });
 
-    test('omits search and is_active when not set', () async {
+    test('every sort maps to a field app-api accepts', () async {
+      const expected = {
+        ProductSort.newest: ('created_at', 'DESC'),
+        ProductSort.oldest: ('created_at', 'ASC'),
+        ProductSort.priceLow: ('price', 'ASC'),
+        ProductSort.priceHigh: ('price', 'DESC'),
+        ProductSort.title: ('name', 'ASC'),
+        ProductSort.titleDesc: ('name', 'DESC'),
+      };
+      expect(expected.keys, containsAll(ProductSort.values));
+
+      for (final MapEntry(key: sort, value: (field, order))
+          in expected.entries) {
+        final t = build((_) => (status: 200, body: listJson([])));
+        await t.repo.fetchProducts(page: 1, sort: sort);
+
+        final query = t.adapter.requests.single.queryParameters;
+        expect(query['sort'], field, reason: '$sort');
+        expect(query['order'], order, reason: '$sort');
+      }
+    });
+
+    test('parses the category options', () async {
+      final t = build(
+        (_) => (
+          status: 200,
+          body: {
+            'data': [
+              {'id': 1001, 'name': ' Poem ', 'product_count': '103'},
+              {'id': 1016, 'name': 'Autobiography', 'product_count': 8},
+            ],
+          },
+        ),
+      );
+
+      final categories = await t.repo.fetchCategories();
+
+      expect(t.adapter.requests.single.path, endsWith('/products/categories'));
+      expect(categories.map((c) => c.name), ['Poem', 'Autobiography']);
+      expect(categories.first.id, 1001);
+      expect(categories.first.productCount, 103); // string from the wire
+    });
+
+    test('omits search and the filter params when not set', () async {
       final t = build((_) => (status: 200, body: listJson([])));
 
       await t.repo.fetchProducts(page: 1, search: '   ');
@@ -182,6 +236,44 @@ void main() {
       final query = t.adapter.requests.single.queryParameters;
       expect(query.containsKey('search'), isFalse);
       expect(query.containsKey('is_active'), isFalse);
+    });
+
+    test('parses the fields the details dialog shows', () async {
+      final row = productJson()
+        ..['description'] =
+            '<p>A collection of <b>essays</b>.</p><p>Tom &amp; Jerry&nbsp;edition</p>';
+      final t = build((_) => (status: 200, body: listJson([row])));
+
+      final product = (await t.repo.fetchProducts(page: 1)).items.first;
+
+      expect(product.isbn, '9788126');
+      expect(product.language, 'Bengali');
+      expect(product.binding, 'Hardcover');
+      expect(product.pageCount, 220);
+      expect(product.publishYear, 2021);
+      expect(product.offeredPrice, 200);
+      expect(product.hasOfferedPrice, isTrue);
+      expect(
+        product.description,
+        'A collection of essays.\n\nTom & Jerry edition',
+      );
+    });
+
+    test('treats legacy blanks as not set', () async {
+      final row = productJson()
+        ..['isbn_number'] = '0'
+        ..['publish_year'] = 0
+        ..['offered_price'] = 0
+        ..['short_description'] = 'Short blurb';
+      final t = build((_) => (status: 200, body: listJson([row])));
+
+      final product = (await t.repo.fetchProducts(page: 1)).items.first;
+
+      expect(product.isbn, isEmpty);
+      expect(product.publishYear, isNull);
+      expect(product.hasOfferedPrice, isFalse);
+      // description is empty in the fixture, so short_description stands in.
+      expect(product.description, 'Short blurb');
     });
 
     test('tolerates legacy rows sending numbers as strings', () async {
@@ -227,9 +319,7 @@ void main() {
 
   group('updateQuantity', () {
     test('PATCHes the absolute total to the right URL', () async {
-      final t = build(
-        (_) => (status: 200, body: productJson(stock: 37)),
-      );
+      final t = build((_) => (status: 200, body: productJson(stock: 37)));
 
       final product = await t.repo.updateQuantity(
         productId: 3244,
@@ -269,10 +359,7 @@ void main() {
       final t = build(
         (_) => (
           status: 400,
-          body: {
-            'statusCode': 400,
-            'message': 'quantity cannot be negative.',
-          },
+          body: {'statusCode': 400, 'message': 'quantity cannot be negative.'},
         ),
       );
 

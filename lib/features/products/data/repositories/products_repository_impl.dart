@@ -19,18 +19,31 @@ class ProductsRepositoryImpl implements ProductsRepository {
     required int page,
     int limit = 10,
     String? search,
-    ProductFilter filter = ProductFilter.all,
-    ProductSort sort = ProductSort.newest,
+    ProductFilters filters = ProductFilters.initial,
+    ProductSort sort = ProductSort.initial,
   }) async {
     try {
       final result = await remoteDataSource.list(
         page: page,
         limit: limit,
         search: search,
-        filter: filter,
+        filters: filters,
         sort: sort,
       );
       return result.toEntity();
+    } on DioException catch (error) {
+      throw mapDioException(error);
+    } on FormatException {
+      throw const ApiFailure(
+        'The server sent something unexpected. Please try again.',
+      );
+    }
+  }
+
+  @override
+  Future<List<ProductCategory>> fetchCategories() async {
+    try {
+      return await remoteDataSource.categories();
     } on DioException catch (error) {
       throw mapDioException(error);
     } on FormatException {

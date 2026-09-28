@@ -1,3 +1,5 @@
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
+
 /// Which shelf a list is showing.
 ///
 /// The two are the same screen with different data behind them, which is why
@@ -38,9 +40,8 @@ class Book {
   /// Drives the "Newest" sort.
   final DateTime addedOn;
 
-  /// Absolute cover URL, or null when there is none — sample books (My
-  /// Publishings) never have one; a real book (My Store) does once a cover
-  /// was uploaded and app-api has a public storage URL configured.
+  /// Absolute cover URL, or null when there is none. A book has one once a
+  /// cover was uploaded and app-api has a public storage URL configured.
   final String? imageUrl;
 
   bool get isInStock => stock > 0;
@@ -81,57 +82,64 @@ class BookPage {
   bool get isEmpty => items.isEmpty;
 }
 
-/// Which books a list shows.
-enum BookFilter {
-  all('All', null),
-  active('Active', 1),
-  inactive('Inactive', 0),
-  inStock('In stock', null);
+/// Which books the My Store list asks `/v1/books` for. Every field maps onto
+/// one query param, so filtering happens on the server and the totals and
+/// paging stay honest.
+class BookFilters {
+  const BookFilters({this.isActive, this.inStockOnly = false, this.category});
 
-  const BookFilter(this.label, this.statusValue);
+  /// What the list opens with, and what Reset goes back to: everything.
+  static const BookFilters initial = BookFilters();
 
-  final String label;
+  /// `status`: true = Active only, false = Inactive only, null = either.
+  final bool? isActive;
 
-  /// Maps onto the server-backed (My Store) list's `status` query param.
-  /// Null means "don't send the parameter" — true for both `all` and
-  /// `inStock`, since app-api has no stock filter yet; [BooksProvider.books]
-  /// applies `inStock` client-side on whatever page comes back instead.
-  final int? statusValue;
+  /// `in_stock=1` when set.
+  final bool inStockOnly;
 
-  /// Used by the sample-data (My Publishings) list, which still filters in
-  /// memory — see [SampleBooks].
-  bool matches(Book book) => switch (this) {
-    BookFilter.all => true,
-    BookFilter.active => book.isActive,
-    BookFilter.inactive => !book.isActive,
-    BookFilter.inStock => book.isInStock,
-  };
+  /// `category` — app-api takes a single one.
+  final BookCategory? category;
+
+  /// How many filters differ from [initial] — the badge on the filter button.
+  int get activeCount =>
+      (isActive != null ? 1 : 0) +
+      (inStockOnly ? 1 : 0) +
+      (category != null ? 1 : 0);
+
+  bool get isInitial => activeCount == 0;
+
+  BookFilters copyWith({
+    bool? isActive,
+    bool clearIsActive = false,
+    bool? inStockOnly,
+    BookCategory? category,
+    bool clearCategory = false,
+  }) => BookFilters(
+    isActive: clearIsActive ? null : isActive ?? this.isActive,
+    inStockOnly: inStockOnly ?? this.inStockOnly,
+    category: clearCategory ? null : category ?? this.category,
+  );
 }
 
-/// The order they appear in.
+/// The order the My Store list comes back in — the Shop's orders, less
+/// Featured, which owner books have nothing to rank by.
 enum BookSort {
   newest('Newest', 'created_at', 'DESC'),
-  name('Name', 'title', 'ASC'),
-  quantity('Qty', 'quantity', 'DESC'),
-  price('Price', 'price', 'DESC');
+  oldest('Oldest', 'created_at', 'ASC'),
+  priceLow('Price: low to high', 'price', 'ASC'),
+  priceHigh('Price: high to low', 'price', 'DESC'),
+  title('Title: A to Z', 'title', 'ASC'),
+  titleDesc('Title: Z to A', 'title', 'DESC');
 
   const BookSort(this.label, this.field, this.order);
 
+  /// What Clear goes back to.
+  static const BookSort initial = BookSort.newest;
+
   final String label;
 
-  /// Maps onto the server-backed (My Store) list's `sort`/`order` query
-  /// params — see `OWNER_BOOK_SORTS` in app-api.
+  /// Maps onto the `sort`/`order` query params — see `OWNER_BOOK_SORTS` in
+  /// app-api.
   final String field;
   final String order;
-
-  /// Used by the sample-data (My Publishings) list, which still sorts in
-  /// memory — see [SampleBooks].
-  int compare(Book a, Book b) => switch (this) {
-    // Newest and the two numeric sorts read best descending: the most recent,
-    // the most stock, the highest price first.
-    BookSort.newest => b.addedOn.compareTo(a.addedOn),
-    BookSort.name => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-    BookSort.quantity => b.stock.compareTo(a.stock),
-    BookSort.price => b.price.compareTo(a.price),
-  };
 }

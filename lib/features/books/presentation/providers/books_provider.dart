@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 
@@ -11,9 +12,8 @@ import 'package:bookslane_app/features/books/domain/repositories/books_repositor
 enum BooksStatus { initial, loading, ready, error }
 
 /// Holds one page of the signed-in account's real books — `My Store`, backed
-/// by `/v1/books` — plus the query that produced it. See [ProductsProvider]
-/// for the same shape; `My Publishings` has no such provider yet, since it
-/// still runs entirely over sample data (see [BookListPage]).
+/// by `/v1/books` — plus the query that produced it. [ProductsProvider] is
+/// the same shape for `My Publishings` over `/v1/products`.
 class BooksProvider extends ChangeNotifier {
   BooksProvider(this._repository, {this.pageSize = 10});
 
@@ -25,8 +25,8 @@ class BooksProvider extends ChangeNotifier {
   String? _errorMessage;
 
   String _search = '';
-  BookFilter _filter = BookFilter.all;
-  BookSort _sort = BookSort.newest;
+  BookFilters _filters = BookFilters.initial;
+  BookSort _sort = BookSort.initial;
   int _currentPage = 1;
 
   /// Typing shouldn't fire a request per keystroke.
@@ -38,19 +38,13 @@ class BooksProvider extends ChangeNotifier {
   BooksStatus get status => _status;
   BookPage? get page => _page;
 
-  /// The fetched page's items, with [BookFilter.inStock] applied client-side
-  /// — app-api has no stock query param yet, so [total]/[totalPages] still
-  /// count every status, not just what ends up shown here.
-  List<Book> get books {
-    final items = _page?.items ?? const [];
-    return _filter == BookFilter.inStock
-        ? items.where((book) => book.isInStock).toList()
-        : items;
-  }
+  /// The fetched page's items. Every filter is applied server-side, so
+  /// [total] and [totalPages] count exactly what's shown.
+  List<Book> get books => _page?.items ?? const [];
 
   String? get errorMessage => _errorMessage;
   String get search => _search;
-  BookFilter get filter => _filter;
+  BookFilters get filters => _filters;
   BookSort get sort => _sort;
   int get currentPage => _currentPage;
   int get totalPages => _page?.totalPages ?? 1;
@@ -80,9 +74,8 @@ class BooksProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> setFilter(BookFilter filter) {
-    if (_filter == filter) return Future.value();
-    _filter = filter;
+  Future<void> setFilters(BookFilters filters) {
+    _filters = filters;
     // Any query change restarts at page one, or you can sit on page 3 of a
     // two-page result and see nothing.
     _currentPage = 1;
@@ -118,8 +111,8 @@ class BooksProvider extends ChangeNotifier {
     final book = await _repository.createBook(draft);
 
     _search = '';
-    _filter = BookFilter.all;
-    _sort = BookSort.newest;
+    _filters = BookFilters.initial;
+    _sort = BookSort.initial;
     _currentPage = 1;
     await _fetch();
 
@@ -133,14 +126,26 @@ class BooksProvider extends ChangeNotifier {
       id: book.id,
       isActive: !book.isActive,
     );
+    _patchInPlace(updated);
+  }
 
+  /// A book's full detail, for prefilling the Edit Book form. Doesn't touch
+  /// [page] — this is a one-off read, not part of the list's own state.
+  Future<BookDetail> getBookDetail(String id) => _repository.getBook(id);
+
+  /// Saves an edit and patches the result into the current page in place —
+  /// same shape as [toggleActive].
+  Future<void> updateBook(String id, BookDraft draft) async {
+    final updated = await _repository.updateBook(id, draft);
+    _patchInPlace(updated);
+  }
+
+  void _patchInPlace(Book updated) {
     final current = _page;
     if (current == null) return;
 
     _page = BookPage(
-      items: [
-        for (final b in current.items) b.id == updated.id ? updated : b,
-      ],
+      items: [for (final b in current.items) b.id == updated.id ? updated : b],
       page: current.page,
       limit: current.limit,
       total: current.total,
@@ -161,7 +166,7 @@ class BooksProvider extends ChangeNotifier {
         page: _currentPage,
         limit: pageSize,
         search: _search,
-        filter: _filter,
+        filters: _filters,
         sort: _sort,
       );
 

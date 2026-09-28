@@ -10,9 +10,9 @@ import 'package:bookslane_app/features/books/presentation/pages/books_hub_page.d
 import 'package:bookslane_app/features/dashboard/presentation/widgets/coming_soon_tab.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/home_tab.dart';
-import 'package:bookslane_app/features/products/presentation/pages/publishings_page.dart';
 import 'package:bookslane_app/features/notifications/presentation/notifications_overlay.dart';
 import 'package:bookslane_app/features/notifications/presentation/widgets/app_notification.dart';
+import 'package:bookslane_app/features/shop/presentation/pages/shop_page.dart';
 
 /// The signed-in shell: app bar, the bottom bar, and whichever tab is open.
 ///
@@ -83,8 +83,8 @@ class _DashboardPageState extends State<DashboardPage> {
   String get _section => switch (_navIndex) {
     0 => 'Home',
     1 => 'Books',
-    2 => 'Orders',
-    3 => 'Calendar',
+    2 => 'Shop',
+    3 => 'Orders',
     _ => 'Profile',
   };
 
@@ -95,10 +95,8 @@ class _DashboardPageState extends State<DashboardPage> {
             onSourceSelected: (source) =>
                 setState(() => _bookSource = source),
           )
-        // My Publishings is live data from /v1/products; My Store is live
-        // data from /v1/books (see BooksProvider).
-        : _bookSource == BookSource.publishings
-        ? PublishingsPage(onBack: () => setState(() => _bookSource = null))
+        // BookListPage routes each shelf to its API: My Store to /v1/books,
+        // My Publishings to /v1/products (the thinkerslane catalogue).
         : BookListPage(
             // A key per shelf, so switching shelves rebuilds the state
             // instead of carrying the previous search and page across.
@@ -106,13 +104,10 @@ class _DashboardPageState extends State<DashboardPage> {
             source: _bookSource!,
             onBack: () => setState(() => _bookSource = null),
           ),
-    2 => const ComingSoonTab(
+    2 => const ShopPage(),
+    3 => const ComingSoonTab(
       title: 'Orders',
       icon: Icons.receipt_long_outlined,
-    ),
-    3 => const ComingSoonTab(
-      title: 'Calendar',
-      icon: Icons.calendar_today_outlined,
     ),
     _ => const ComingSoonTab(
       title: 'Profile',
@@ -219,14 +214,14 @@ class _DashboardPageState extends State<DashboardPage> {
             label: 'Books',
           ),
           NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront_rounded),
+            label: 'Shop',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long_rounded),
             label: 'Orders',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_today_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Calendar',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),

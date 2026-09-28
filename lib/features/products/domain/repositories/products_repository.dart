@@ -9,9 +9,13 @@ abstract interface class ProductsRepository {
     required int page,
     int limit,
     String? search,
-    ProductFilter filter,
+    ProductFilters filters,
     ProductSort sort,
   });
+
+  /// The categories the publisher's products are filed under — the options
+  /// for the category filter.
+  Future<List<ProductCategory>> fetchCategories();
 
   /// Sets a product's stock to [quantity] and returns the updated product.
   ///

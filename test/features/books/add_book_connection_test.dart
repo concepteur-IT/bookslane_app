@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
@@ -27,8 +28,8 @@ class _FakeBooksRepository implements BooksRepository {
     required int page,
     int limit = 10,
     String? search,
-    BookFilter filter = BookFilter.all,
-    BookSort sort = BookSort.newest,
+    BookFilters filters = BookFilters.initial,
+    BookSort sort = BookSort.initial,
   }) async {
     return BookPage(
       items: List.of(_books),
@@ -63,6 +64,14 @@ class _FakeBooksRepository implements BooksRepository {
     _books[index] = updated;
     return updated;
   }
+
+  /// Not exercised by these tests — see edit_book_test.dart for the fake that
+  /// actually models full detail.
+  @override
+  Future<BookDetail> getBook(String id) => throw UnimplementedError();
+
+  @override
+  Future<Book> updateBook(String id, BookDraft draft) => throw UnimplementedError();
 }
 
 /// A 1x1 PNG — enough for `Image.memory` to decode a real thumbnail.
@@ -198,7 +207,8 @@ void main() {
     // The sheet closed and the book is on the list, with the author standing
     // in for the empty subtitle and the price converted to minor units.
     expect(find.text('ADD BOOK'), findsNothing);
-    expect(find.text('Wuthering Heights'), findsOneWidget);
+    // Twice: the card title, and the generated cover (no image in tests).
+    expect(find.text('Wuthering Heights'), findsNWidgets(2));
     expect(find.text('Emily Bronte'), findsOneWidget);
     expect(find.textContaining('450'), findsWidgets);
     expect(

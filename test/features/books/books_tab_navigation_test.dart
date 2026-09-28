@@ -3,6 +3,7 @@ import 'package:bookslane_app/features/auth/domain/entities/user.dart';
 import 'package:bookslane_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:bookslane_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
@@ -34,8 +35,8 @@ class _StubProducts implements ProductsRepository {
     required int page,
     int limit = 10,
     String? search,
-    ProductFilter filter = ProductFilter.all,
-    ProductSort sort = ProductSort.newest,
+    ProductFilters filters = ProductFilters.initial,
+    ProductSort sort = ProductSort.initial,
   }) async => const ProductPage(
     items: [
       Product(
@@ -56,6 +57,9 @@ class _StubProducts implements ProductsRepository {
   );
 
   @override
+  Future<List<ProductCategory>> fetchCategories() async => const [];
+
+  @override
   Future<Product> updateQuantity({
     required int productId,
     required int quantity,
@@ -69,8 +73,8 @@ class _StubBooks implements BooksRepository {
     required int page,
     int limit = 10,
     String? search,
-    BookFilter filter = BookFilter.all,
-    BookSort sort = BookSort.newest,
+    BookFilters filters = BookFilters.initial,
+    BookSort sort = BookSort.initial,
   }) async => const BookPage(
     items: [],
     page: 1,
@@ -81,7 +85,14 @@ class _StubBooks implements BooksRepository {
   );
 
   @override
+  Future<BookDetail> getBook(String id) async => throw UnimplementedError();
+
+  @override
   Future<Book> createBook(BookDraft draft) async => throw UnimplementedError();
+
+  @override
+  Future<Book> updateBook(String id, BookDraft draft) async =>
+      throw UnimplementedError();
 
   @override
   Future<Book> setActive({required String id, required bool isActive}) async =>
@@ -121,8 +132,9 @@ void main() {
     expect(navItem('Products'), findsNothing);
   });
 
-  testWidgets('Books opens the hub, a shelf opens the list, back returns',
-      (tester) async {
+  testWidgets('Books opens the hub, a shelf opens the list, back returns', (
+    tester,
+  ) async {
     await pumpShell(tester);
     expect(find.byType(HomeTab), findsOneWidget);
 
@@ -135,7 +147,8 @@ void main() {
     await tester.pumpAndSettle();
     // Live data from /v1/products, not the sample shelf.
     expect(find.byType(PublishingsPage), findsOneWidget);
-    expect(find.text('Baitalik'), findsOneWidget);
+    // Twice: the card title, and the generated cover (no image in tests).
+    expect(find.text('Baitalik'), findsNWidgets(2));
     // The bottom bar stays put — the list is a tab body, not a pushed route.
     expect(find.byType(NavigationBar), findsOneWidget);
 
@@ -144,8 +157,9 @@ void main() {
     expect(find.byType(BooksHubPage), findsOneWidget);
   });
 
-  testWidgets('tapping Books while on a shelf goes back up to the hub',
-      (tester) async {
+  testWidgets('tapping Books while on a shelf goes back up to the hub', (
+    tester,
+  ) async {
     await pumpShell(tester);
 
     await tester.tap(navItem('Books'));
@@ -160,7 +174,9 @@ void main() {
     expect(find.byType(BooksHubPage), findsOneWidget);
   });
 
-  testWidgets('an inner page swaps the branded bar for its own', (tester) async {
+  testWidgets('an inner page swaps the branded bar for its own', (
+    tester,
+  ) async {
     await pumpShell(tester);
     // The tab root shows the branded bar.
     expect(find.text('Bookslane'), findsOneWidget);
@@ -178,8 +194,9 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 
-  testWidgets('the unbuilt tabs say so instead of showing the last one',
-      (tester) async {
+  testWidgets('the unbuilt tabs say so instead of showing the last one', (
+    tester,
+  ) async {
     await pumpShell(tester);
 
     await tester.tap(navItem('Orders'));

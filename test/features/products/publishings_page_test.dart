@@ -1,9 +1,11 @@
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
+import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/products/domain/entities/product.dart';
 import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
 import 'package:bookslane_app/features/products/presentation/pages/publishings_page.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/product_card.dart';
+import 'package:bookslane_app/features/products/presentation/widgets/product_details_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -28,17 +30,25 @@ class FakeProductsRepository implements ProductsRepository {
 
   /// Records what the quantity endpoint was asked to store.
   final List<({int productId, int quantity})> writes = [];
-  final List<({int page, String? search, ProductFilter filter})> reads = [];
+  final List<
+    ({int page, String? search, ProductFilters filters, ProductSort sort})
+  >
+  reads = [];
+
+  List<ProductCategory> categories = const [
+    ProductCategory(id: 1001, name: 'Poem'),
+    ProductCategory(id: 1016, name: 'Autobiography'),
+  ];
 
   @override
   Future<ProductPage> fetchProducts({
     required int page,
     int limit = 10,
     String? search,
-    ProductFilter filter = ProductFilter.all,
-    ProductSort sort = ProductSort.newest,
+    ProductFilters filters = ProductFilters.initial,
+    ProductSort sort = ProductSort.initial,
   }) async {
-    reads.add((page: page, search: search, filter: filter));
+    reads.add((page: page, search: search, filters: filters, sort: sort));
     if (failure != null) throw failure!;
     return ProductPage(
       items: items,
@@ -51,6 +61,9 @@ class FakeProductsRepository implements ProductsRepository {
   }
 
   @override
+  Future<List<ProductCategory>> fetchCategories() async => categories;
+
+  @override
   Future<Product> updateQuantity({
     required int productId,
     required int quantity,
@@ -60,9 +73,7 @@ class FakeProductsRepository implements ProductsRepository {
     final updated = items
         .firstWhere((p) => p.id == productId)
         .copyWith(stock: quantity);
-    items = [
-      for (final p in items) p.id == productId ? updated : p,
-    ];
+    items = [for (final p in items) p.id == productId ? updated : p];
     return updated;
   }
 }
@@ -90,19 +101,62 @@ Future<void> pumpPage(
 void main() {
   testWidgets('lists the products returned by /v1/products', (tester) async {
     final repository = FakeProductsRepository(
-      items: [_product(), _product(id: 99, name: 'Gitanjali', stock: 0)],
+      items: [
+        _product(),
+        _product(id: 99, name: 'Gitanjali', stock: 0),
+      ],
     );
     await pumpPage(tester, repository);
 
     expect(find.byType(ProductCard), findsNWidgets(2));
-    expect(find.text('Baitalik'), findsOneWidget);
+    // Twice: the card title, and the generated cover (no image in tests).
+    expect(find.text('Baitalik'), findsNWidgets(2));
     expect(find.text('12 in stock'), findsOneWidget);
     expect(find.text('Out of stock'), findsOneWidget);
     expect(repository.reads.single.page, 1);
   });
 
-  testWidgets('the edit button opens the form with the current quantity',
-      (tester) async {
+  testWidgets('the eye icon opens the product details', (tester) async {
+    await pumpPage(
+      tester,
+      FakeProductsRepository(
+        items: [
+          const Product(
+            id: 3244,
+            name: 'Baitalik',
+            author: 'Rabindranath Tagore',
+            code: 'BK-3244',
+            price: 250,
+            stock: 12,
+            isActive: true,
+            isbn: '9788126',
+            language: 'Bengali',
+            pageCount: 220,
+            offeredPrice: 200,
+            description: 'A collection of essays.',
+          ),
+        ],
+      ),
+    );
+
+    await tester.tap(find.byTooltip('View details'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProductDetailsDialog), findsOneWidget);
+    expect(find.text('9788126'), findsOneWidget);
+    expect(find.text('Bengali'), findsOneWidget);
+    expect(find.text('220'), findsOneWidget);
+    expect(find.text('₹200.00'), findsOneWidget); // offered price
+    expect(find.text('A collection of essays.'), findsOneWidget);
+
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProductDetailsDialog), findsNothing);
+  });
+
+  testWidgets('the edit button opens the form with the current quantity', (
+    tester,
+  ) async {
     await pumpPage(tester, FakeProductsRepository());
 
     await tester.tap(find.byTooltip('Edit quantity'));
@@ -114,8 +168,9 @@ void main() {
     expect(find.text('QUANTITY TO ADD'), findsOneWidget);
   });
 
-  testWidgets('adding to stock previews and saves the combined total',
-      (tester) async {
+  testWidgets('adding to stock previews and saves the combined total', (
+    tester,
+  ) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
@@ -138,8 +193,9 @@ void main() {
     expect(find.text('Baitalik now has 37 in stock.'), findsOneWidget);
   });
 
-  testWidgets('a negative addition is allowed while the total stays valid',
-      (tester) async {
+  testWidgets('a negative addition is allowed while the total stays valid', (
+    tester,
+  ) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
@@ -152,8 +208,9 @@ void main() {
     expect(repository.writes.single.quantity, 7);
   });
 
-  testWidgets('a total below zero is refused before any request',
-      (tester) async {
+  testWidgets('a total below zero is refused before any request', (
+    tester,
+  ) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
@@ -180,8 +237,9 @@ void main() {
     expect(repository.writes, isEmpty);
   });
 
-  testWidgets('a failed save shows the message and keeps the form open',
-      (tester) async {
+  testWidgets('a failed save shows the message and keeps the form open', (
+    tester,
+  ) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
@@ -219,8 +277,9 @@ void main() {
     expect(find.byType(ProductCard), findsOneWidget);
   });
 
-  testWidgets('the form fits above the keyboard on a short screen',
-      (tester) async {
+  testWidgets('the form fits above the keyboard on a short screen', (
+    tester,
+  ) async {
     // A small phone — 360x640, smaller than the device this was first seen on.
     tester.view.physicalSize = const Size(360 * 3, 640 * 3);
     tester.view.devicePixelRatio = 3;
@@ -253,14 +312,69 @@ void main() {
     expect(find.text('37'), findsOneWidget); // the preview still updates
   });
 
-  testWidgets('filtering refetches from the server', (tester) async {
+  testWidgets('the filter overlay refetches from the server', (tester) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
-    await tester.tap(find.text('Inactive'));
+    Finder inPanel(String text) => find.descendant(
+      of: find.byType(FilterPanelFrame),
+      matching: find.text(text),
+    );
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    // The category chips are the publisher's own, from fetchCategories.
+    expect(inPanel('Poem'), findsOneWidget);
+    expect(inPanel('Autobiography'), findsOneWidget);
+
+    await tester.tap(inPanel('Inactive'));
+    await tester.tap(find.byType(Switch));
+    await tester.tap(inPanel('Poem'));
+    await tester.pumpAndSettle();
+    await tester.tap(inPanel('APPLY'));
     await tester.pumpAndSettle();
 
-    expect(repository.reads.last.filter, ProductFilter.inactive);
+    final filters = repository.reads.last.filters;
+    expect(filters.isActive, isFalse);
+    expect(filters.inStockOnly, isTrue);
+    expect(filters.category?.id, 1001);
     expect(repository.reads.last.page, 1);
+    expect(find.text('3'), findsOneWidget); // the filter badge
   });
+
+  testWidgets('the sort overlay refetches, and Clear resets it', (
+    tester,
+  ) async {
+    final repository = FakeProductsRepository();
+    await pumpPage(tester, repository);
+
+    await tester.tap(find.byTooltip('Sort'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Price: low to high'));
+    await tester.pumpAndSettle();
+    expect(repository.reads.last.sort, ProductSort.priceLow);
+
+    await tester.tap(find.byTooltip('Sort'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('CLEAR'));
+    await tester.pumpAndSettle();
+    expect(repository.reads.last.sort, ProductSort.initial);
+  });
+
+  testWidgets('a failed category load says so in the panel', (tester) async {
+    final repository = _NoCategories();
+    await pumpPage(tester, repository);
+
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+
+    expect(find.text("Categories couldn't be loaded."), findsOneWidget);
+    expect(find.byType(ProductCard), findsOneWidget, reason: 'list unaffected');
+  });
+}
+
+class _NoCategories extends FakeProductsRepository {
+  @override
+  Future<List<ProductCategory>> fetchCategories() async =>
+      throw const ApiFailure('Cannot reach the server.');
 }

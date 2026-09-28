@@ -4,24 +4,26 @@ import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 
-/// One row of the books list: cover tile, title and subtitle, status, price,
+/// One row of the books list: cover, title and subtitle, status, price,
 /// and the two per-row actions.
 class BookCard extends StatelessWidget {
   const BookCard({
     super.key,
     required this.book,
     this.onTap,
-    this.onToggleActive,
+    this.onViewDetails,
     this.onEdit,
   });
 
   final Book book;
   final VoidCallback? onTap;
 
-  /// The round dot on the right — flips active/inactive.
-  final VoidCallback? onToggleActive;
+  /// The eye icon — opens [BookDetailsDialog] on this book.
+  final VoidCallback? onViewDetails;
 
   final VoidCallback? onEdit;
+
+  static const double _coverWidth = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,17 @@ class BookCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Cover(imageUrl: book.imageUrl),
+              // The Shop's 2:3 cover, at the Shop list's thumbnail width.
+              SizedBox(
+                width: _coverWidth,
+                child: BookCover(
+                  title: book.title,
+                  author: book.subtitle,
+                  imageUrl: book.imageUrl,
+                  seed: book.id,
+                  compact: true,
+                ),
+              ),
 
               const SizedBox(width: AppSpacing.sm),
 
@@ -62,7 +74,11 @@ class BookCard extends StatelessWidget {
                       style: AppTypography.bodySmall,
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Row(
+                    // A Wrap, not a Row: beside the cover, a narrow phone leaves too
+                    // little width for both pills on one line.
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xxs,
                       children: [
                         StatusPill(
                           label: book.isActive ? 'Active' : 'Inactive',
@@ -70,8 +86,7 @@ class BookCard extends StatelessWidget {
                               ? AppColors.successText
                               : AppColors.secondaryText,
                         ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Flexible(child: _StockPill(stock: book.stock)),
+                        _StockPill(stock: book.stock),
                       ],
                     ),
                   ],
@@ -88,15 +103,13 @@ class BookCard extends StatelessWidget {
                   Row(
                     children: [
                       _SquareAction(
-                        onPressed: onToggleActive,
-                        tooltip: book.isActive ? 'Deactivate' : 'Activate',
-                        background: book.isActive
-                            ? AppColors.successBackground
-                            : AppColors.inputBackground,
-                        child: _Dot(
-                          color: book.isActive
-                              ? AppColors.successText
-                              : AppColors.iconMuted,
+                        onPressed: onViewDetails,
+                        tooltip: 'View details',
+                        background: AppColors.inputBackground,
+                        child: Icon(
+                          Icons.visibility_outlined,
+                          size: AppSizes.iconSm,
+                          color: AppColors.iconMuted,
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
@@ -120,41 +133,6 @@ class BookCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The cover image, falling back to the book icon when there is none — every
-/// sample book (My Publishings) — or it fails to load. See ProductCard's
-/// `_Cover` for the same shape.
-class _Cover extends StatelessWidget {
-  const _Cover({this.imageUrl});
-
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: AppSizes.tileMd,
-      height: AppSizes.tileMd,
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        color: AppColors.brandSoftBackground,
-        borderRadius: AppRadius.mdAll,
-      ),
-      child: imageUrl == null
-          ? _placeholder
-          : Image.network(
-              imageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _placeholder,
-            ),
-    );
-  }
-
-  static Widget get _placeholder => Icon(
-    Icons.inventory_2_outlined,
-    size: AppSizes.iconLg,
-    color: AppColors.brandPrimary,
-  );
 }
 
 /// "23 in stock" — grey, or red once nothing is left.
@@ -219,21 +197,6 @@ class _SquareAction extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: AppSpacing.md,
-      height: AppSpacing.md,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

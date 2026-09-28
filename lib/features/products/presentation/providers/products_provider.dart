@@ -25,8 +25,15 @@ class ProductsProvider extends ChangeNotifier {
   String? _errorMessage;
 
   String _search = '';
-  ProductFilter _filter = ProductFilter.all;
-  ProductSort _sort = ProductSort.newest;
+  ProductFilters _filters = ProductFilters.initial;
+  ProductSort _sort = ProductSort.initial;
+
+  /// Options for the category filter; empty until [loadCategories] lands.
+  List<ProductCategory> _categories = const [];
+  bool _categoriesFailed = false;
+
+  /// The categories call can land after the page is closed.
+  bool _disposed = false;
   int _currentPage = 1;
 
   /// Typing shouldn't fire a request per keystroke.
@@ -40,7 +47,12 @@ class ProductsProvider extends ChangeNotifier {
   List<Product> get products => _page?.items ?? const [];
   String? get errorMessage => _errorMessage;
   String get search => _search;
-  ProductFilter get filter => _filter;
+  ProductFilters get filters => _filters;
+  List<ProductCategory> get categories => _categories;
+
+  /// True when the category list couldn't be fetched — the filter panel says
+  /// so rather than showing an empty section.
+  bool get categoriesFailed => _categoriesFailed;
   ProductSort get sort => _sort;
   int get currentPage => _currentPage;
   int get totalPages => _page?.totalPages ?? 1;
@@ -51,11 +63,24 @@ class ProductsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> load() => _fetch();
+  Future<void> load() => Future.wait([_fetch(), loadCategories()]);
+
+  /// Fetches the category filter's options. A failure here never blocks the
+  /// list; it only leaves the section empty with a note.
+  Future<void> loadCategories() async {
+    try {
+      _categories = await _repository.fetchCategories();
+      _categoriesFailed = false;
+    } on ApiFailure {
+      _categoriesFailed = true;
+    }
+    if (!_disposed) notifyListeners();
+  }
 
   Future<void> refresh() => _fetch();
 
@@ -70,9 +95,8 @@ class ProductsProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> setFilter(ProductFilter filter) {
-    if (_filter == filter) return Future.value();
-    _filter = filter;
+  Future<void> setFilters(ProductFilters filters) {
+    _filters = filters;
     // Any query change restarts at page one, or you can sit on page 3 of a
     // two-page result and see nothing.
     _currentPage = 1;
@@ -142,7 +166,7 @@ class ProductsProvider extends ChangeNotifier {
         page: _currentPage,
         limit: pageSize,
         search: _search,
-        filter: _filter,
+        filters: _filters,
         sort: _sort,
       );
 

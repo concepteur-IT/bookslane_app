@@ -85,7 +85,8 @@ abstract final class AppColors {
   static const Color headingText = AppPalette.neutral900; // "Welcome back"
   static const Color bodyText = AppPalette.neutral900;
   static const Color secondaryText = AppPalette.neutral700;
-  static const Color mutedText = AppPalette.neutral500; // sub-headlines, captions
+  static const Color mutedText =
+      AppPalette.neutral500; // sub-headlines, captions
   static const Color disabledText = AppPalette.neutral400;
   static const Color inverseText = AppPalette.white; // on dark/brand surfaces
 
@@ -97,7 +98,8 @@ abstract final class AppColors {
   static const Color iconPrimary = AppPalette.neutral700;
   static const Color iconMuted = AppPalette.neutral500;
   static const Color focusRing = AppPalette.purple500;
-  static const Color controlSelected = AppPalette.red500; // checkbox, switch, radio
+  static const Color controlSelected =
+      AppPalette.red500; // checkbox, switch, radio
   static const Color controlUnselectedBorder = AppPalette.neutral300;
   static const Color navItemSelected = AppPalette.purple500;
   static const Color navItemUnselected = AppPalette.neutral500;
@@ -128,6 +130,26 @@ abstract final class AppColors {
   static const Color skeletonBase = AppPalette.neutral50;
   static const Color skeletonHighlight = AppPalette.neutral300;
   static const Color dragHandle = AppPalette.neutral300;
+
+  // ---------------------------------------------------------------------------
+  // Book covers — the generated cover shown when a book has no image
+  // ---------------------------------------------------------------------------
+  /// Picked per book (stable by id), so a shelf of imageless books reads as
+  /// a varied row of spines rather than a wall of one colour.
+  static const List<Color> coverTints = [
+    AppPalette.navy700,
+    AppPalette.purple500,
+    AppPalette.red700,
+    AppPalette.purple900,
+    AppPalette.green500,
+    AppPalette.blue500,
+  ];
+  static const Color coverText = AppPalette.white;
+  static const Color coverTextMuted = AppPalette.white80;
+
+  /// The dark "Sold out" tag laid over a cover.
+  static const Color soldOutTagBackground = AppPalette.neutral900;
+  static const Color soldOutTagText = AppPalette.white;
 
   // ---------------------------------------------------------------------------
   // Shadows

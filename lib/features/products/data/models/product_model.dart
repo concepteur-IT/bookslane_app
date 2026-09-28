@@ -16,6 +16,13 @@ class ProductModel {
     required this.isActive,
     this.imageUrl,
     this.publisherName,
+    this.isbn = '',
+    this.language = '',
+    this.binding = '',
+    this.pageCount = 0,
+    this.publishYear,
+    this.offeredPrice = 0,
+    this.description = '',
   });
 
   final int id;
@@ -27,6 +34,13 @@ class ProductModel {
   final bool isActive;
   final String? imageUrl;
   final String? publisherName;
+  final String isbn;
+  final String language;
+  final String binding;
+  final int pageCount;
+  final int? publishYear;
+  final double offeredPrice;
+  final String description;
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     final publisher = json['publisher'];
@@ -42,12 +56,31 @@ class ProductModel {
       stock: asInt(json['stock']),
       // is_active is 0/1 on the wire, not a bool.
       isActive: asInt(json['is_active']) == 1,
-      imageUrl: json['image_url'] is String && (json['image_url'] as String).isNotEmpty
+      imageUrl:
+          json['image_url'] is String &&
+              (json['image_url'] as String).isNotEmpty
           ? json['image_url'] as String
           : null,
       publisherName: publisher is Map<String, dynamic>
           ? asString(publisher['name'])
           : null,
+      // isbn_number is a bigint column: 0 upstream means "not set".
+      isbn: switch (asString(json['isbn_number'])) {
+        '0' => '',
+        final isbn => isbn,
+      },
+      language: asString(json['language']).trim(),
+      binding: asString(json['binding']).trim(),
+      pageCount: asInt(json['page_number']),
+      publishYear: json['publish_year'] == null
+          ? null
+          : asInt(json['publish_year']),
+      offeredPrice: asDouble(json['offered_price']),
+      description: plainText(
+        asString(json['description']).trim().isNotEmpty
+            ? json['description']
+            : json['short_description'],
+      ),
     );
   }
 
@@ -61,6 +94,13 @@ class ProductModel {
     isActive: isActive,
     imageUrl: imageUrl,
     publisherName: publisherName,
+    isbn: isbn,
+    language: language,
+    binding: binding,
+    pageCount: pageCount,
+    publishYear: publishYear == 0 ? null : publishYear,
+    offeredPrice: offeredPrice,
+    description: description,
   );
 
   // ---------------------------------------------------------------------------
@@ -82,6 +122,30 @@ class ProductModel {
   }
 
   static String asString(Object? value) => value?.toString() ?? '';
+
+  /// The legacy CMS stores descriptions as HTML. Turns paragraphs and line
+  /// breaks into newlines, drops every other tag and decodes the common entities.
+  static String plainText(Object? value) {
+    final html = asString(value);
+    if (html.isEmpty) return '';
+
+    return html
+        // Paragraphs get a blank line between them; line breaks just one.
+        .replaceAll(RegExp(r'</p>|</div>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp(r'<br\s*/?>|</li>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        // Last, so '&amp;lt;' stays the literal text '&lt;'.
+        .replaceAll('&amp;', '&')
+        .replaceAll(RegExp(r'[ \t]+'), ' ')
+        .replaceAll(RegExp(r' *\n *'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
 }
 
 /// Wire format of `ProductListResponseDto` — `data` plus the `pagination`

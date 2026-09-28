@@ -1,7 +1,11 @@
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 
 /// Wire format of app-api's `BookDto` (`/v1/books`).
 ///
+/// Carries every field the DTO sends, not just what [Book] (the list row)
+/// needs — [toDetail] uses the rest to prefill the Edit Book form.
 /// Coercion helpers mirror [ProductModel]'s, even though app-api's own books
 /// endpoint sends proper JSON types throughout — keeping the same defensive
 /// shape means one less thing to relearn when reading either model.
@@ -10,8 +14,16 @@ class BookModel {
     required this.id,
     required this.name,
     required this.subtitle,
+    required this.sku,
     required this.author,
+    required this.description,
+    required this.language,
+    required this.category,
+    required this.binding,
     required this.price,
+    required this.discount,
+    required this.discountType,
+    required this.effectivePrice,
     required this.quantity,
     required this.isActive,
     required this.createdAt,
@@ -21,10 +33,21 @@ class BookModel {
   final int id;
   final String name;
   final String subtitle;
+  final String sku;
   final String author;
+  final String description;
+  final String language;
+  final String category;
+  final String binding;
 
   /// Major units, as the API sends and expects them.
   final double price;
+
+  final double discount;
+  final String discountType;
+
+  /// Price after the discount — app-api computes and stores this.
+  final double effectivePrice;
 
   final int quantity;
   final bool isActive;
@@ -36,12 +59,23 @@ class BookModel {
       id: asInt(json['id']),
       name: asString(json['name']),
       subtitle: asString(json['subtitle']),
+      sku: asString(json['sku']),
       author: asString(json['author']),
+      description: asString(json['description']),
+      language: asString(json['language']),
+      category: asString(json['category']),
+      binding: asString(json['binding']),
       price: asDouble(json['price']),
+      discount: asDouble(json['discount']),
+      discountType: asString(json['discount_type']),
+      effectivePrice: asDouble(json['effective_price']),
       quantity: asInt(json['quantity']),
       isActive: asInt(json['is_active']) == 1,
-      createdAt: DateTime.tryParse(asString(json['created_at'])) ?? DateTime.now(),
-      imageUrl: json['image_url'] is String && (json['image_url'] as String).isNotEmpty
+      createdAt:
+          DateTime.tryParse(asString(json['created_at'])) ?? DateTime.now(),
+      imageUrl:
+          json['image_url'] is String &&
+              (json['image_url'] as String).isNotEmpty
           ? json['image_url'] as String
           : null,
     );
@@ -59,6 +93,25 @@ class BookModel {
     stock: quantity,
     isActive: isActive,
     addedOn: createdAt,
+    imageUrl: imageUrl,
+  );
+
+  BookDetail toDetail() => BookDetail(
+    id: id.toString(),
+    title: name,
+    subtitle: subtitle,
+    sku: sku,
+    author: author,
+    description: description,
+    language: BookLanguage.fromCode(language),
+    category: BookCategory.fromId(category),
+    binding: BookBinding.fromValue(binding),
+    price: price,
+    discount: discount,
+    discountType: DiscountType.fromValue(discountType),
+    effectivePrice: effectivePrice,
+    quantity: quantity,
+    status: BookStatus.fromValue(isActive ? 1 : 0),
     imageUrl: imageUrl,
   );
 

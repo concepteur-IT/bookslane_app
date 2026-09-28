@@ -4,13 +4,21 @@ import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/products/domain/entities/product.dart';
 
-/// One product row. The pencil is the only action: quantity is all this
-/// screen can change.
+/// One product row. The eye opens the full details; the pencil edits the
+/// quantity, which is all this screen can change.
 class ProductCard extends StatelessWidget {
-  const ProductCard({super.key, required this.product, this.onEditQuantity});
+  const ProductCard({
+    super.key,
+    required this.product,
+    this.onViewDetails,
+    this.onEditQuantity,
+  });
 
   final Product product;
+  final VoidCallback? onViewDetails;
   final VoidCallback? onEditQuantity;
+
+  static const double _coverWidth = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +32,17 @@ class ProductCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Cover(imageUrl: product.imageUrl),
+          // The Shop's 2:3 cover, at the Shop list's thumbnail width.
+          SizedBox(
+            width: _coverWidth,
+            child: BookCover(
+              title: product.name,
+              author: product.author,
+              imageUrl: product.imageUrl,
+              seed: '${product.id}',
+              compact: true,
+            ),
+          ),
 
           const SizedBox(width: AppSpacing.sm),
 
@@ -46,7 +64,11 @@ class ProductCard extends StatelessWidget {
                   style: AppTypography.bodySmall,
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Row(
+                // A Wrap, not a Row: beside the cover, a narrow phone leaves too
+                // little width for both pills on one line.
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xxs,
                   children: [
                     StatusPill(
                       label: product.isActive ? 'Active' : 'Inactive',
@@ -54,8 +76,7 @@ class ProductCard extends StatelessWidget {
                           ? AppColors.successText
                           : AppColors.secondaryText,
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Flexible(child: _StockPill(stock: product.stock)),
+                    _StockPill(stock: product.stock),
                   ],
                 ),
               ],
@@ -69,25 +90,25 @@ class ProductCard extends StatelessWidget {
             children: [
               Text(product.formattedPrice, style: AppTypography.titleLarge),
               const SizedBox(height: AppSpacing.sm),
-              Tooltip(
-                message: 'Edit quantity',
-                child: Material(
-                  color: AppColors.brandSoftBackground,
-                  borderRadius: AppRadius.smAll,
-                  child: InkWell(
-                    borderRadius: AppRadius.smAll,
-                    onTap: onEditQuantity,
-                    child: SizedBox(
-                      width: AppSizes.tileMd - AppSpacing.xs,
-                      height: AppSizes.tileMd - AppSpacing.xs,
-                      child: Icon(
-                        Icons.edit_outlined,
-                        size: AppSizes.iconSm,
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _SquareAction(
+                    tooltip: 'View details',
+                    onPressed: onViewDetails,
+                    background: AppColors.inputBackground,
+                    icon: Icons.visibility_outlined,
+                    iconColor: AppColors.iconMuted,
                   ),
-                ),
+                  const SizedBox(width: AppSpacing.xs),
+                  _SquareAction(
+                    tooltip: 'Edit quantity',
+                    onPressed: onEditQuantity,
+                    background: AppColors.brandSoftBackground,
+                    icon: Icons.edit_outlined,
+                    iconColor: AppColors.brandPrimary,
+                  ),
+                ],
               ),
             ],
           ),
@@ -97,38 +118,41 @@ class ProductCard extends StatelessWidget {
   }
 }
 
-/// The cover image, falling back to the box icon when there is none or it
-/// fails to load.
-class _Cover extends StatelessWidget {
-  const _Cover({this.imageUrl});
+/// A small square icon button — the same shape as BookCard's actions.
+class _SquareAction extends StatelessWidget {
+  const _SquareAction({
+    required this.tooltip,
+    required this.onPressed,
+    required this.background,
+    required this.icon,
+    required this.iconColor,
+  });
 
-  final String? imageUrl;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Color background;
+  final IconData icon;
+  final Color iconColor;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: AppSizes.tileMd,
-      height: AppSizes.tileMd,
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        color: AppColors.brandSoftBackground,
-        borderRadius: AppRadius.mdAll,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: background,
+        borderRadius: AppRadius.smAll,
+        child: InkWell(
+          borderRadius: AppRadius.smAll,
+          onTap: onPressed,
+          child: SizedBox(
+            width: AppSizes.tileMd - AppSpacing.xs,
+            height: AppSizes.tileMd - AppSpacing.xs,
+            child: Icon(icon, size: AppSizes.iconSm, color: iconColor),
+          ),
+        ),
       ),
-      child: imageUrl == null
-          ? _placeholder
-          : Image.network(
-              imageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _placeholder,
-            ),
     );
   }
-
-  static Widget get _placeholder => Icon(
-    Icons.inventory_2_outlined,
-    size: AppSizes.iconLg,
-    color: AppColors.brandPrimary,
-  );
 }
 
 class _StockPill extends StatelessWidget {

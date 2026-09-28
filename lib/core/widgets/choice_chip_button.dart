@@ -10,6 +10,7 @@ class ChoiceChipButton extends StatelessWidget {
     required this.isSelected,
     required this.onPressed,
     this.selectedColor = AppColors.brandPrimary,
+    this.dense = false,
   });
 
   final String label;
@@ -18,6 +19,9 @@ class ChoiceChipButton extends StatelessWidget {
 
   /// Filled with this when selected; outlined on white when not.
   final Color selectedColor;
+
+  /// Smaller type and padding, for chips packed into a popover.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -34,18 +38,24 @@ class ChoiceChipButton extends StatelessWidget {
               color: isSelected ? selectedColor : AppColors.borderColor,
             ),
           ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm + 2,
-            vertical: AppSpacing.xs + 2,
-          ),
+          padding: dense
+              ? const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                )
+              : const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm + 2,
+                  vertical: AppSpacing.xs + 2,
+                ),
           child: Text(
             label,
-            style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
-              color: isSelected
-                  ? AppColors.inverseText
-                  : AppColors.secondaryText,
-            ),
+            style: (dense ? AppTypography.titleMedium : AppTypography.bodyLarge)
+                .copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? AppColors.inverseText
+                      : AppColors.secondaryText,
+                ),
           ),
         ),
       ),

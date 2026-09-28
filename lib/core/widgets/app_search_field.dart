@@ -12,11 +12,16 @@ class AppSearchField extends StatelessWidget {
     this.controller,
     this.onChanged,
     this.hintText = 'Search stores, orders, products...',
+    this.dense = false,
   });
 
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final String hintText;
+
+  /// Trims the field to [AppSizes.minTapTarget] tall, so it lines up with
+  /// square icon buttons on the same row.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +33,12 @@ class AppSearchField extends StatelessWidget {
       cursorColor: AppColors.inputCursor,
       decoration: InputDecoration(
         hintText: hintText,
+        contentPadding: dense
+            ? const EdgeInsets.symmetric(
+                vertical: AppSpacing.sm + 2,
+                horizontal: AppSpacing.xxs,
+              )
+            : null,
         fillColor: AppColors.surfaceBackground,
         prefixIcon: const Padding(
           padding: EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.sm),

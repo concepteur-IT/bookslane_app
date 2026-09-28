@@ -5,10 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 
-/// The Add Book form.
+/// The Add/Edit Book form.
 ///
 /// Owns its own input state plus the in-flight request: once every field
 /// validates it calls [onSubmit] with the finished [BookDraft] and awaits it,
@@ -16,20 +17,31 @@ import 'package:bookslane_app/features/books/domain/entities/book_form_options.d
 /// the API call, updating a list, showing a toast on failure — is the
 /// caller's business; the form only knows whether that future succeeded.
 ///
+/// [initial] switches it from Add to Edit: fields prefill from it, a picked
+/// cover is optional (leaving it alone keeps the current one, since
+/// [BookDraft.image] null means "no change" to app-api), and [onSubmit]
+/// should call `updateBook` instead of `createBook` — see
+/// `BookListPage._editBook`.
+///
 /// This is a `Column`, like [LoginForm] — it is taller than a phone screen, so
 /// the caller is expected to put it inside a scroll view.
 class AddBookForm extends StatefulWidget {
   const AddBookForm({
     super.key,
     this.source,
+    this.initial,
     this.onSubmit,
     this.isSubmitting = false,
   });
 
   /// Which shelf the book is being added to. Titles the form; the caller
   /// already knows which list it is inserting into, so it is not part of
-  /// [BookDraft].
+  /// [BookDraft]. Ignored once [initial] is set — an edit is titled "Edit
+  /// book" regardless of shelf.
   final BookSource? source;
+
+  /// The book being edited, or null to add a new one.
+  final BookDetail? initial;
 
   /// Awaited once the form validates. Throwing (e.g. an `ApiFailure`) keeps
   /// the sheet open with every field intact — see `BookListPage._addBook` for
@@ -41,7 +53,8 @@ class AddBookForm extends StatefulWidget {
   /// beyond the request [onSubmit] itself makes.
   final bool isSubmitting;
 
-  /// Opens the form in a modal sheet over the current page.
+  /// Opens the form in a modal sheet over the current page, to add a new
+  /// book.
   ///
   /// Resolves to the finished [BookDraft] once [onSubmit] succeeds, or null
   /// if the sheet was dismissed without submitting — so the caller can
@@ -60,6 +73,31 @@ class AddBookForm extends StatefulWidget {
     required BookSource source,
     required Future<void> Function(BookDraft draft) onSubmit,
   }) {
+    return _showSheet(context, AddBookForm(source: source, onSubmit: onSubmit));
+  }
+
+  /// Opens the form in a modal sheet, prefilled to edit an existing book —
+  /// see [initial]. Same resolution rules as [show].
+  ///
+  /// ```dart
+  /// final draft = await AddBookForm.showEdit(
+  ///   context,
+  ///   initial: detail,
+  ///   onSubmit: (draft) => booksRepository.updateBook(detail.id, draft),
+  /// );
+  /// ```
+  static Future<BookDraft?> showEdit(
+    BuildContext context, {
+    required BookDetail initial,
+    required Future<void> Function(BookDraft draft) onSubmit,
+  }) {
+    return _showSheet(
+      context,
+      AddBookForm(initial: initial, onSubmit: onSubmit),
+    );
+  }
+
+  static Future<BookDraft?> _showSheet(BuildContext context, AddBookForm form) {
     return showModalBottomSheet<BookDraft>(
       context: context,
       isScrollControlled: true,
@@ -83,7 +121,7 @@ class AddBookForm extends StatefulWidget {
             AppSpacing.lg,
             AppSpacing.lg,
           ),
-          child: AddBookForm(source: source, onSubmit: onSubmit),
+          child: form,
         ),
       ),
     );
@@ -115,6 +153,33 @@ class _AddBookFormState extends State<AddBookForm> {
   /// True while [widget.onSubmit] is in flight — separate from
   /// [AddBookForm.isSubmitting], which the caller controls.
   bool _isSubmitting = false;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final initial = widget.initial;
+    if (initial == null) return;
+
+    _titleController.text = initial.title;
+    _subtitleController.text = initial.subtitle;
+    _skuController.text = initial.sku;
+    _authorController.text = initial.author;
+    _descriptionController.text = initial.description;
+    _priceController.text = initial.price.toStringAsFixed(2);
+    // 0 reads as "no discount set" rather than a literal "0.00".
+    _discountController.text = initial.discount == 0
+        ? ''
+        : initial.discount.toStringAsFixed(2);
+    _quantityController.text = initial.quantity.toString();
+    _language = initial.language;
+    _category = initial.category;
+    _binding = initial.binding;
+    _discountType = initial.discountType;
+    _status = initial.status;
+  }
 
   @override
   void dispose() {
@@ -238,7 +303,9 @@ class _AddBookFormState extends State<AddBookForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            widget.source == null
+            _isEditing
+                ? 'Edit book'
+                : widget.source == null
                 ? 'Add a book'
                 : 'Add to ${widget.source!.label}',
             style: AppTypography.displayMedium,
@@ -480,13 +547,24 @@ class _AddBookFormState extends State<AddBookForm> {
           // ---- Cover image ----------------------------------------------
           const FieldLabel('Cover image', isRequired: false),
           const SizedBox(height: AppSpacing.labelGap),
+          if (_isEditing &&
+              _image == null &&
+              widget.initial!.imageUrl != null) ...[
+            _CurrentCover(imageUrl: widget.initial!.imageUrl!),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           ImagePickerField(
             value: _image,
-            hintText: 'Choose a cover image',
+            hintText: _isEditing
+                ? 'Choose a new cover image'
+                : 'Choose a cover image',
             helperText: 'JPG or PNG. Downscaled to 1600px on upload.',
             onChanged: (file) => setState(() => _image = file),
+            // A new cover is required to create a book, but optional on an
+            // edit — leaving it untouched keeps the current one (see
+            // BookDraft.image), so there's nothing to validate.
             validator: (file) =>
-                file == null ? 'Please add a cover image' : null,
+                !_isEditing && file == null ? 'Please add a cover image' : null,
           ),
 
           const SizedBox(height: AppSpacing.fieldGap),
@@ -509,8 +587,10 @@ class _AddBookFormState extends State<AddBookForm> {
           const SizedBox(height: AppSpacing.xl),
 
           CtaButton(
-            label: 'ADD BOOK',
-            icon: Icons.arrow_forward_rounded,
+            label: _isEditing ? 'SAVE CHANGES' : 'ADD BOOK',
+            icon: _isEditing
+                ? Icons.check_rounded
+                : Icons.arrow_forward_rounded,
             isLoading: widget.isSubmitting || _isSubmitting,
             onPressed: _submit,
           ),
@@ -518,6 +598,49 @@ class _AddBookFormState extends State<AddBookForm> {
           const SizedBox(height: AppSpacing.md),
         ],
       ),
+    );
+  }
+}
+
+/// The book's current cover, shown above the picker while editing so
+/// leaving the field alone reads as "keep this" rather than "there's
+/// nothing here" — the picker itself never learns about a remote URL, it
+/// only ever holds a freshly-picked [XFile].
+class _CurrentCover extends StatelessWidget {
+  const _CurrentCover({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        ClipRRect(
+          borderRadius: AppRadius.xsAll,
+          child: Image.network(
+            imageUrl,
+            width: AppSizes.tileLg,
+            height: AppSizes.tileLg,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(
+              width: AppSizes.tileLg,
+              height: AppSizes.tileLg,
+              color: AppColors.dividerColor,
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: AppColors.iconMuted,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            'Current cover — pick a new photo below to replace it.',
+            style: AppTypography.caption,
+          ),
+        ),
+      ],
     );
   }
 }

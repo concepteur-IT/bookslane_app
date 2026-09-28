@@ -8,6 +8,8 @@ import 'package:bookslane_app/features/products/domain/entities/product.dart';
 import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
 import 'package:bookslane_app/features/products/presentation/providers/products_provider.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/product_card.dart';
+import 'package:bookslane_app/features/products/presentation/widgets/product_details_dialog.dart';
+import 'package:bookslane_app/features/products/presentation/widgets/product_filter_panel.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/update_quantity_sheet.dart';
 
 /// My Publishings — the signed-in publisher's catalogue from `/v1/products`.
@@ -78,22 +80,14 @@ class _PublishingsView extends StatelessWidget {
             color: AppColors.iconPrimary,
           ),
         ],
-        searchField: AppSearchField(
-          hintText: 'Search name, author, code or ISBN...',
-          onChanged: provider.setSearch,
-        ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: AppSpacing.md),
-
-          _FilterRow(provider: provider),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          _SortRow(provider: provider),
-
-          const SizedBox(height: AppSpacing.md),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: _PublishingsToolbar(provider: provider),
+          ),
 
           Expanded(
             child: _Body(provider: provider, onEdit: _editQuantity),
@@ -104,66 +98,61 @@ class _PublishingsView extends StatelessWidget {
   }
 }
 
-class _FilterRow extends StatelessWidget {
-  const _FilterRow({required this.provider});
+/// Search, filter and sort on one line — the Shop's toolbar, over
+/// [ProductsProvider]. Stateful only to own the key the overlays anchor to.
+class _PublishingsToolbar extends StatefulWidget {
+  const _PublishingsToolbar({required this.provider});
 
   final ProductsProvider provider;
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Row(
-        children: [
-          for (final filter in ProductFilter.values) ...[
-            ChoiceChipButton(
-              label: filter.label,
-              isSelected: filter == provider.filter,
-              selectedColor: AppColors.brandPrimary,
-              onPressed: () => provider.setFilter(filter),
-            ),
-            if (filter != ProductFilter.values.last)
-              const SizedBox(width: AppSpacing.xs),
-          ],
-        ],
-      ),
-    );
-  }
+  State<_PublishingsToolbar> createState() => _PublishingsToolbarState();
 }
 
-class _SortRow extends StatelessWidget {
-  const _SortRow({required this.provider});
+class _PublishingsToolbarState extends State<_PublishingsToolbar> {
+  final GlobalKey _anchor = GlobalKey();
 
-  final ProductsProvider provider;
+  Future<void> _openFilters() async {
+    final provider = widget.provider;
+    final filters = await showAnchoredPanel<ProductFilters>(
+      context: context,
+      anchor: _anchor,
+      builder: (_) => ProductFilterPanel(
+        initial: provider.filters,
+        categories: provider.categories,
+        categoriesFailed: provider.categoriesFailed,
+      ),
+    );
+    if (filters != null) await provider.setFilters(filters);
+  }
+
+  Future<void> _openSort() async {
+    final sort = await showAnchoredPanel<ProductSort>(
+      context: context,
+      anchor: _anchor,
+      maxWidth: 280,
+      builder: (_) => SortPanel<ProductSort>(
+        options: ProductSort.values,
+        selected: widget.provider.sort,
+        initial: ProductSort.initial,
+        labelOf: (sort) => sort.label,
+      ),
+    );
+    if (sort != null) await widget.provider.setSort(sort);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: Row(
-        children: [
-          Icon(
-            Icons.tune_rounded,
-            size: AppSizes.iconMd,
-            color: AppColors.iconMuted,
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Text('Sort', style: AppTypography.bodyMedium),
-          const SizedBox(width: AppSpacing.sm),
-          for (final sort in ProductSort.values) ...[
-            ChoiceChipButton(
-              label: sort == provider.sort ? '${sort.label} ↓' : sort.label,
-              isSelected: sort == provider.sort,
-              selectedColor: AppColors.headingText,
-              onPressed: () => provider.setSort(sort),
-            ),
-            if (sort != ProductSort.values.last)
-              const SizedBox(width: AppSpacing.xs),
-          ],
-        ],
-      ),
+    final provider = widget.provider;
+
+    return ListToolbar(
+      key: _anchor,
+      searchHint: 'Name, author, code or ISBN',
+      filterCount: provider.filters.activeCount,
+      isSorted: provider.sort != ProductSort.initial,
+      onSearchChanged: provider.setSearch,
+      onFilterPressed: _openFilters,
+      onSortPressed: _openSort,
     );
   }
 }
@@ -207,6 +196,7 @@ class _Body extends StatelessWidget {
           for (final product in provider.products) ...[
             ProductCard(
               product: product,
+              onViewDetails: () => ProductDetailsDialog.show(context, product),
               onEditQuantity: () => onEdit(context, product),
             ),
             const SizedBox(height: AppSpacing.sm),

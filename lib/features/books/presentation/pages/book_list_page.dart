@@ -5,26 +5,22 @@ import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
-import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
-import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
-import 'package:bookslane_app/features/books/domain/entities/sample_books.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/providers/books_provider.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_card.dart';
-import 'package:bookslane_app/features/books/presentation/widgets/book_filter_bar.dart';
+import 'package:bookslane_app/features/books/presentation/widgets/book_details_dialog.dart';
+import 'package:bookslane_app/features/books/presentation/widgets/book_filter_panel.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/add_book.dart';
+import 'package:bookslane_app/features/products/presentation/pages/publishings_page.dart';
 
-/// The `My Store` shelf: real data, backed by [BooksProvider] over
-/// `GET /v1/books`. This is the only [source] `DashboardPage` ever routes
-/// here with — `My Publishings` goes to [PublishingsPage] over `/v1/products`
-/// instead, chosen there rather than here (see its comment on `_body`).
+/// One Books shelf, chosen by [source]:
 ///
-/// [source] still accepts [BookSource.publishings] and, if given it, falls
-/// back to the old sample-data view rather than crashing: `owner_books` has
-/// no column yet that says which shelf a book belongs to, so nothing here
-/// could ask the API for "just the publishings" if it wanted to. That branch
-/// only runs today when a test constructs this widget directly with
-/// `source: BookSource.publishings` — see `books_test.dart`.
+/// * `My Store` — the caller's own books, backed by [BooksProvider] over
+///   `GET /v1/books`.
+/// * `My Publishings` — the caller's imprint catalogue in the thinkerslane
+///   (legacy) database, served by app-api's `GET /v1/products`. That shelf
+///   has its own feature and page, [PublishingsPage]; this just routes to it.
 class BookListPage extends StatelessWidget {
   const BookListPage({super.key, required this.source, this.onBack});
 
@@ -42,7 +38,7 @@ class BookListPage extends StatelessWidget {
         child: _StoreBookListView(onBack: onBack),
       );
     }
-    return _SampleBookListPage(source: source, onBack: onBack);
+    return PublishingsPage(onBack: onBack);
   }
 }
 
@@ -79,20 +75,57 @@ class _StoreBookListView extends StatelessWidget {
     }
   }
 
-  Future<void> _toggleActive(BuildContext context, Book book) async {
+  /// Fetches a book's full detail behind a loading dialog — the list row
+  /// doesn't carry enough for either the details popup or the Edit Book
+  /// form. Returns null (having already shown the toast) on failure.
+  Future<BookDetail?> _fetchDetail(BuildContext context, Book book) async {
     final provider = context.read<BooksProvider>();
-    final wasActive = book.isActive;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
     try {
-      await provider.toggleActive(book);
-      if (context.mounted) {
-        AppToast.info(
-          context,
-          '${book.title} is now ${wasActive ? 'inactive' : 'active'}.',
-        );
-      }
+      final detail = await provider.getBookDetail(book.id);
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      return detail;
     } on ApiFailure catch (failure) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
       if (context.mounted) AppToast.error(context, failure.message);
+      return null;
+    }
+  }
+
+  Future<void> _viewDetails(BuildContext context, Book book) async {
+    final detail = await _fetchDetail(context, book);
+    if (detail == null || !context.mounted) return;
+    await BookDetailsDialog.show(context, detail);
+  }
+
+  /// Fetches the book's full detail, then opens the Edit Book sheet on it.
+  Future<void> _editBook(BuildContext context, Book book) async {
+    final provider = context.read<BooksProvider>();
+
+    final detail = await _fetchDetail(context, book);
+    if (detail == null || !context.mounted) return;
+
+    final draft = await AddBookForm.showEdit(
+      context,
+      initial: detail,
+      onSubmit: (draft) async {
+        try {
+          await provider.updateBook(book.id, draft);
+        } on ApiFailure catch (failure) {
+          if (context.mounted) AppToast.error(context, failure.message);
+          rethrow; // keeps the sheet open with every field intact
+        }
+      },
+    );
+
+    if (draft != null && context.mounted) {
+      AppToast.success(context, '${draft.title} updated.');
     }
   }
 
@@ -112,40 +145,101 @@ class _StoreBookListView extends StatelessWidget {
             child: _AddButton(onPressed: () => _addBook(context)),
           ),
         ],
-        searchField: AppSearchField(
-          hintText: 'Search books...',
-          onChanged: provider.setSearch,
-        ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: AppSpacing.md),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: _StoreToolbar(provider: provider),
+          ),
 
-          BookFilterBar(selected: provider.filter, onChanged: provider.setFilter),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          BookSortBar(selected: provider.sort, onChanged: provider.setSort),
-
-          const SizedBox(height: AppSpacing.md),
-
-          Expanded(child: _StoreBody(provider: provider, onToggleActive: _toggleActive)),
+          Expanded(
+            child: _StoreBody(
+              provider: provider,
+              onViewDetails: _viewDetails,
+              onEdit: _editBook,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _StoreBody extends StatelessWidget {
-  const _StoreBody({required this.provider, required this.onToggleActive});
+/// Search, filter and sort on one line — the Shop's toolbar, over
+/// [BooksProvider]. Stateful only to own the key the overlays anchor to.
+class _StoreToolbar extends StatefulWidget {
+  const _StoreToolbar({required this.provider});
 
   final BooksProvider provider;
-  final Future<void> Function(BuildContext, Book) onToggleActive;
+
+  @override
+  State<_StoreToolbar> createState() => _StoreToolbarState();
+}
+
+class _StoreToolbarState extends State<_StoreToolbar> {
+  final GlobalKey _anchor = GlobalKey();
+
+  Future<void> _openFilters() async {
+    final filters = await showAnchoredPanel<BookFilters>(
+      context: context,
+      anchor: _anchor,
+      builder: (_) => BookFilterPanel(initial: widget.provider.filters),
+    );
+    if (filters != null) await widget.provider.setFilters(filters);
+  }
+
+  Future<void> _openSort() async {
+    final sort = await showAnchoredPanel<BookSort>(
+      context: context,
+      anchor: _anchor,
+      maxWidth: 280,
+      builder: (_) => SortPanel<BookSort>(
+        options: BookSort.values,
+        selected: widget.provider.sort,
+        initial: BookSort.initial,
+        labelOf: (sort) => sort.label,
+      ),
+    );
+    if (sort != null) await widget.provider.setSort(sort);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = widget.provider;
+
+    return ListToolbar(
+      key: _anchor,
+      filterCount: provider.filters.activeCount,
+      isSorted: provider.sort != BookSort.initial,
+      onSearchChanged: provider.setSearch,
+      onFilterPressed: _openFilters,
+      onSortPressed: _openSort,
+    );
+  }
+}
+
+class _StoreBody extends StatelessWidget {
+  const _StoreBody({
+    required this.provider,
+    required this.onViewDetails,
+    required this.onEdit,
+  });
+
+  final BooksProvider provider;
+  final Future<void> Function(BuildContext, Book) onViewDetails;
+  final Future<void> Function(BuildContext, Book) onEdit;
 
   @override
   Widget build(BuildContext context) {
     // First load only: later refetches keep the list on screen and dim it, so
-    // paging doesn't flash an empty page — see PublishingsPage._Body.
+    // paging doesn't flash an empty page — the same as PublishingsPage.
     if (provider.status == BooksStatus.loading && provider.books.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -174,11 +268,8 @@ class _StoreBody extends StatelessWidget {
           for (final book in provider.books) ...[
             BookCard(
               book: book,
-              onToggleActive: () => onToggleActive(context, book),
-              onEdit: () => AppToast.info(
-                context,
-                'Editing ${book.title} is not built yet.',
-              ),
+              onViewDetails: () => onViewDetails(context, book),
+              onEdit: () => onEdit(context, book),
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -228,215 +319,6 @@ class _ErrorState extends StatelessWidget {
             OutlinedButton(onPressed: onRetry, child: const Text('TRY AGAIN')),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// My Publishings — sample data, in memory. Unchanged until app-api can tell
-// the two shelves apart.
-// ---------------------------------------------------------------------------
-
-class _SampleBookListPage extends StatefulWidget {
-  const _SampleBookListPage({required this.source, this.onBack});
-
-  final BookSource source;
-  final VoidCallback? onBack;
-
-  @override
-  State<_SampleBookListPage> createState() => _SampleBookListPageState();
-}
-
-class _SampleBookListPageState extends State<_SampleBookListPage> {
-  static const int _pageSize = 6;
-
-  late List<Book> _books = [...SampleBooks.forSource(widget.source)];
-
-  String _query = '';
-  BookFilter _filter = BookFilter.all;
-  BookSort _sort = BookSort.newest;
-  int _page = 0;
-
-  /// Everything matching the search box and the filter chip, in sort order.
-  List<Book> get _matching {
-    final query = _query.trim().toLowerCase();
-
-    final matches = _books.where((book) {
-      if (!_filter.matches(book)) return false;
-      if (query.isEmpty) return true;
-      return book.title.toLowerCase().contains(query) ||
-          book.subtitle.toLowerCase().contains(query);
-    }).toList();
-
-    matches.sort(_sort.compare);
-    return matches;
-  }
-
-  int get _pageCount => (_matching.length / _pageSize).ceil().clamp(1, 999);
-
-  List<Book> get _visible {
-    final matches = _matching;
-    final start = _page * _pageSize;
-    if (start >= matches.length) return const [];
-    return matches.sublist(start, (start + _pageSize).clamp(0, matches.length));
-  }
-
-  /// Any change to the query, filter or sort restarts at page one — otherwise
-  /// you can end up on page 3 of a two-page result and see nothing.
-  void _resetPage() => _page = 0;
-
-  void _toggleActive(Book book) {
-    setState(() {
-      _books = [
-        for (final b in _books)
-          b.id == book.id ? b.copyWith(isActive: !b.isActive) : b,
-      ];
-    });
-    AppToast.info(
-      context,
-      '${book.title} is now ${book.isActive ? 'inactive' : 'active'}.',
-    );
-  }
-
-  /// Opens the Add Book sheet and puts what comes back at the top of the list.
-  ///
-  /// No API involved — this shelf is still sample data, so the draft is
-  /// turned into a [Book] locally rather than round tripped through
-  /// `POST /v1/books` (see [_bookFromDraft]).
-  Future<void> _addBook() async {
-    final draft = await AddBookForm.show(
-      context,
-      source: widget.source,
-      onSubmit: (draft) async {
-        setState(() {
-          _books = [_bookFromDraft(draft), ..._books];
-
-          // A book you just added has to be on screen. Left on a Price sort,
-          // an Inactive filter or page 3, it would save successfully and
-          // appear to have vanished.
-          _sort = BookSort.newest;
-          _filter = BookFilter.all;
-          _resetPage();
-        });
-      },
-    );
-
-    if (draft == null || !mounted) return;
-
-    AppToast.success(
-      context,
-      '${draft.title} added to ${widget.source.label}.',
-    );
-  }
-
-  /// The form produces a [BookDraft]; the list shows [Book]s.
-  ///
-  /// The draft's language, category, binding, discount and cover image have
-  /// nowhere to go on this sample [Book] and are dropped.
-  Book _bookFromDraft(BookDraft draft) => Book(
-    id: 'new-${DateTime.now().microsecondsSinceEpoch}',
-    title: draft.title,
-    // The card's second line: the subtitle when there is one, the author
-    // otherwise — the same fallback [Product.subtitle] makes.
-    subtitle: draft.subtitle.isNotEmpty ? draft.subtitle : draft.author,
-    // Book keeps money in minor units; the form collects major units.
-    price: (draft.price * 100).round(),
-    stock: draft.quantity,
-    isActive: draft.status == BookStatus.active,
-    addedOn: DateTime.now(),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final matching = _matching;
-    final visible = _visible;
-
-    return Scaffold(
-      backgroundColor: AppColors.screenBackground,
-      appBar: InnerPageAppBar(
-        title: widget.source.label,
-        subtitle: '${matching.length} books',
-        onBack: widget.onBack,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: _AddButton(onPressed: _addBook),
-          ),
-        ],
-        searchField: AppSearchField(
-          hintText: 'Search books...',
-          onChanged: (value) => setState(() {
-            _query = value;
-            _resetPage();
-          }),
-        ),
-      ),
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          const SizedBox(height: AppSpacing.md),
-
-          BookFilterBar(
-            selected: _filter,
-            onChanged: (filter) => setState(() {
-              _filter = filter;
-              _resetPage();
-            }),
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-
-          BookSortBar(
-            selected: _sort,
-            onChanged: (sort) => setState(() {
-              _sort = sort;
-              _resetPage();
-            }),
-          ),
-
-          const SizedBox(height: AppSpacing.md),
-
-          if (visible.isEmpty)
-            const _EmptyState()
-          else
-            for (final book in visible)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  0,
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                ),
-                child: BookCard(
-                  book: book,
-                  onToggleActive: () => _toggleActive(book),
-                  onEdit: () => AppToast.info(
-                    context,
-                    'Editing ${book.title} is not built yet.',
-                  ),
-                ),
-              ),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.xl,
-            ),
-            child: PaginationBar(
-              shown: visible.length,
-              total: matching.length,
-              page: _page + 1,
-              pageCount: _pageCount,
-              onPrevious: _page > 0 ? () => setState(() => _page--) : null,
-              onNext: _page + 1 < _pageCount
-                  ? () => setState(() => _page++)
-                  : null,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -20,6 +20,16 @@ enum BookLanguage {
 
   /// What goes on the wire — 'en', 'hi', …
   final String code;
+
+  /// Null when [code] doesn't match any of these — e.g. legacy or free-form
+  /// data the fixed dropdown doesn't cover. The Edit Book form leaves the
+  /// field unset in that case rather than guessing.
+  static BookLanguage? fromCode(String? code) {
+    for (final language in values) {
+      if (language.code == code) return language;
+    }
+    return null;
+  }
 }
 
 /// `category` on the products table. The value is the numeric category id.
@@ -42,6 +52,17 @@ enum BookCategory {
 
   final String label;
   final int id;
+
+  /// Null when [id] doesn't parse or match any of these — see
+  /// [BookLanguage.fromCode] for the same fallback.
+  static BookCategory? fromId(String? id) {
+    final parsed = int.tryParse(id ?? '');
+    if (parsed == null) return null;
+    for (final category in values) {
+      if (category.id == parsed) return category;
+    }
+    return null;
+  }
 }
 
 /// `binding` on the products table — how the book is bound.
@@ -57,6 +78,15 @@ enum BookBinding {
 
   final String label;
   final String value;
+
+  /// Null when [value] doesn't match any of these — see
+  /// [BookLanguage.fromCode] for the same fallback.
+  static BookBinding? fromValue(String? value) {
+    for (final binding in values) {
+      if (binding.value == value) return binding;
+    }
+    return null;
+  }
 }
 
 /// `discount_type` on the products table.
@@ -68,6 +98,16 @@ enum DiscountType {
 
   final String label;
   final String value;
+
+  /// Unlike [BookLanguage.fromCode] this always resolves: app-api's own
+  /// `discount_type` column only ever holds one of these two values, so
+  /// there's no legacy/free-form case to fall back on — defaults to [flat].
+  static DiscountType fromValue(String? value) {
+    for (final type in values) {
+      if (type.value == value) return type;
+    }
+    return DiscountType.flat;
+  }
 }
 
 /// `status` on the products table. Mirrors the 0/1 `is_active` the product
@@ -80,4 +120,9 @@ enum BookStatus {
 
   final String label;
   final int value;
+
+  /// Always resolves — see [DiscountType.fromValue] for why.
+  static BookStatus fromValue(int value) => value == BookStatus.active.value
+      ? BookStatus.active
+      : BookStatus.inactive;
 }
