@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
@@ -9,7 +10,6 @@ import 'package:bookslane_app/features/products/domain/repositories/products_rep
 import 'package:bookslane_app/features/products/presentation/providers/products_provider.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/product_card.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/product_details_dialog.dart';
-import 'package:bookslane_app/features/products/presentation/widgets/product_filter_panel.dart';
 import 'package:bookslane_app/features/products/presentation/widgets/update_quantity_sheet.dart';
 
 /// My Publishings — the signed-in publisher's catalogue from `/v1/products`.
@@ -114,13 +114,13 @@ class _PublishingsToolbarState extends State<_PublishingsToolbar> {
 
   Future<void> _openFilters() async {
     final provider = widget.provider;
-    final filters = await showAnchoredPanel<ProductFilters>(
+    final filters = await showAnchoredPanel<CatalogFilters>(
       context: context,
       anchor: _anchor,
-      builder: (_) => ProductFilterPanel(
+      builder: (_) => DynamicFilterPanel(
+        spec: ProductsProvider.filterSpec,
         initial: provider.filters,
-        categories: provider.categories,
-        categoriesFailed: provider.categoriesFailed,
+        loadFacets: provider.loadFacets,
       ),
     );
     if (filters != null) await provider.setFilters(filters);
@@ -148,7 +148,9 @@ class _PublishingsToolbarState extends State<_PublishingsToolbar> {
     return ListToolbar(
       key: _anchor,
       searchHint: 'Name, author, code or ISBN',
-      filterCount: provider.filters.activeCount,
+      filterCount: provider.filters.activeCount(
+        ProductsProvider.filterSpec.initial,
+      ),
       isSorted: provider.sort != ProductSort.initial,
       onSearchChanged: provider.setSearch,
       onFilterPressed: _openFilters,

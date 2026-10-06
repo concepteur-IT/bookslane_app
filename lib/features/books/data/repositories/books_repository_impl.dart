@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/features/books/data/datasources/books_remote_datasource.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 
 /// Implements [BooksRepository] against app-api.
@@ -22,7 +24,7 @@ class BooksRepositoryImpl implements BooksRepository {
     required int page,
     int limit = 10,
     String? search,
-    BookFilters filters = BookFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     BookSort sort = BookSort.initial,
   }) async {
     try {
@@ -34,6 +36,28 @@ class BooksRepositoryImpl implements BooksRepository {
         sort: sort,
       );
       return result.toEntity();
+    } on DioException catch (error) {
+      throw mapDioException(error);
+    } on FormatException {
+      throw const ApiFailure(
+        'The server sent something unexpected. Please try again.',
+      );
+    }
+  }
+
+  @override
+  Future<List<BookCategory>> fetchCategories() =>
+      _guarded(remoteDataSource.categories);
+
+  @override
+  Future<FilterFacets> fetchFilters(CatalogFilters filters, {String? search}) =>
+      _guarded(
+        () => remoteDataSource.filterFacets(filters: filters, search: search),
+      );
+
+  Future<T> _guarded<T>(Future<T> Function() fetch) async {
+    try {
+      return await fetch();
     } on DioException catch (error) {
       throw mapDioException(error);
     } on FormatException {

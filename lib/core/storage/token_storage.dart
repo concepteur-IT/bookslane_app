@@ -45,10 +45,7 @@ class SecureTokenStorage implements TokenStorage {
     required String accessToken,
     required String refreshToken,
   }) async {
-    await _storage.write(
-      key: AppConstants.accessTokenKey,
-      value: accessToken,
-    );
+    await _storage.write(key: AppConstants.accessTokenKey, value: accessToken);
     await _storage.write(
       key: AppConstants.refreshTokenKey,
       value: refreshToken,

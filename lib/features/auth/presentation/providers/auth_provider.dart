@@ -59,10 +59,7 @@ class AuthProvider extends ChangeNotifier {
   /// Throws [AuthFailure] with a message for the user; the caller catches it
   /// and shows a toast. On success [status] flips and the gate swaps screens —
   /// the caller does not navigate.
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     if (_isSubmitting) return; // guards a double tap
     _setSubmitting(true);
 

@@ -1,5 +1,3 @@
-import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
-
 /// Which shelf a list is showing.
 ///
 /// The two are the same screen with different data behind them, which is why
@@ -80,45 +78,6 @@ class BookPage {
   final bool hasNext;
 
   bool get isEmpty => items.isEmpty;
-}
-
-/// Which books the My Store list asks `/v1/books` for. Every field maps onto
-/// one query param, so filtering happens on the server and the totals and
-/// paging stay honest.
-class BookFilters {
-  const BookFilters({this.isActive, this.inStockOnly = false, this.category});
-
-  /// What the list opens with, and what Reset goes back to: everything.
-  static const BookFilters initial = BookFilters();
-
-  /// `status`: true = Active only, false = Inactive only, null = either.
-  final bool? isActive;
-
-  /// `in_stock=1` when set.
-  final bool inStockOnly;
-
-  /// `category` — app-api takes a single one.
-  final BookCategory? category;
-
-  /// How many filters differ from [initial] — the badge on the filter button.
-  int get activeCount =>
-      (isActive != null ? 1 : 0) +
-      (inStockOnly ? 1 : 0) +
-      (category != null ? 1 : 0);
-
-  bool get isInitial => activeCount == 0;
-
-  BookFilters copyWith({
-    bool? isActive,
-    bool clearIsActive = false,
-    bool? inStockOnly,
-    BookCategory? category,
-    bool clearCategory = false,
-  }) => BookFilters(
-    isActive: clearIsActive ? null : isActive ?? this.isActive,
-    inStockOnly: inStockOnly ?? this.inStockOnly,
-    category: clearCategory ? null : category ?? this.category,
-  );
 }
 
 /// The order the My Store list comes back in — the Shop's orders, less

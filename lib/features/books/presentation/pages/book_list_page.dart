@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/providers/books_provider.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_card.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_details_dialog.dart';
-import 'package:bookslane_app/features/books/presentation/widgets/book_filter_panel.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/add_book.dart';
 import 'package:bookslane_app/features/products/presentation/pages/publishings_page.dart';
 
@@ -51,12 +52,40 @@ class _StoreBookListView extends StatelessWidget {
 
   final VoidCallback? onBack;
 
+  /// Runs [task] behind a loading dialog and returns its result. Returns
+  /// null (having already shown the toast) when it throws an [ApiFailure].
+  Future<T?> _withSpinner<T>(
+    BuildContext context,
+    Future<T> Function() task,
+  ) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final result = await task();
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      return result;
+    } on ApiFailure catch (failure) {
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (context.mounted) AppToast.error(context, failure.message);
+      return null;
+    }
+  }
+
   Future<void> _addBook(BuildContext context) async {
     final provider = context.read<BooksProvider>();
+
+    // The form's Category dropdown needs the category list first.
+    final categories = await _withSpinner(context, provider.formCategories);
+    if (categories == null || !context.mounted) return;
 
     final draft = await AddBookForm.show(
       context,
       source: BookSource.store,
+      categories: categories,
       onSubmit: (draft) async {
         try {
           await provider.createBook(draft);
@@ -78,24 +107,9 @@ class _StoreBookListView extends StatelessWidget {
   /// Fetches a book's full detail behind a loading dialog — the list row
   /// doesn't carry enough for either the details popup or the Edit Book
   /// form. Returns null (having already shown the toast) on failure.
-  Future<BookDetail?> _fetchDetail(BuildContext context, Book book) async {
+  Future<BookDetail?> _fetchDetail(BuildContext context, Book book) {
     final provider = context.read<BooksProvider>();
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final detail = await provider.getBookDetail(book.id);
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      return detail;
-    } on ApiFailure catch (failure) {
-      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-      if (context.mounted) AppToast.error(context, failure.message);
-      return null;
-    }
+    return _withSpinner(context, () => provider.getBookDetail(book.id));
   }
 
   Future<void> _viewDetails(BuildContext context, Book book) async {
@@ -104,16 +118,27 @@ class _StoreBookListView extends StatelessWidget {
     await BookDetailsDialog.show(context, detail);
   }
 
-  /// Fetches the book's full detail, then opens the Edit Book sheet on it.
+  /// Fetches the book's full detail and the category list, then opens the
+  /// Edit Book sheet on them.
   Future<void> _editBook(BuildContext context, Book book) async {
     final provider = context.read<BooksProvider>();
 
-    final detail = await _fetchDetail(context, book);
-    if (detail == null || !context.mounted) return;
+    // Detail and the category list together, behind one spinner.
+    final loaded = await _withSpinner(
+      context,
+      () => Future.wait([
+        provider.getBookDetail(book.id),
+        provider.formCategories(),
+      ]),
+    );
+    if (loaded == null || !context.mounted) return;
+    final detail = loaded[0] as BookDetail;
+    final categories = loaded[1] as List<BookCategory>;
 
     final draft = await AddBookForm.showEdit(
       context,
       initial: detail,
+      categories: categories,
       onSubmit: (draft) async {
         try {
           await provider.updateBook(book.id, draft);
@@ -187,10 +212,14 @@ class _StoreToolbarState extends State<_StoreToolbar> {
   final GlobalKey _anchor = GlobalKey();
 
   Future<void> _openFilters() async {
-    final filters = await showAnchoredPanel<BookFilters>(
+    final filters = await showAnchoredPanel<CatalogFilters>(
       context: context,
       anchor: _anchor,
-      builder: (_) => BookFilterPanel(initial: widget.provider.filters),
+      builder: (_) => DynamicFilterPanel(
+        spec: BooksProvider.filterSpec,
+        initial: widget.provider.filters,
+        loadFacets: widget.provider.loadFacets,
+      ),
     );
     if (filters != null) await widget.provider.setFilters(filters);
   }
@@ -216,7 +245,9 @@ class _StoreToolbarState extends State<_StoreToolbar> {
 
     return ListToolbar(
       key: _anchor,
-      filterCount: provider.filters.activeCount,
+      filterCount: provider.filters.activeCount(
+        BooksProvider.filterSpec.initial,
+      ),
       isSorted: provider.sort != BookSort.initial,
       onSearchChanged: provider.setSearch,
       onFilterPressed: _openFilters,

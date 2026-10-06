@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/features/products/data/datasources/products_remote_datasource.dart';
 import 'package:bookslane_app/features/products/domain/entities/product.dart';
@@ -19,7 +20,7 @@ class ProductsRepositoryImpl implements ProductsRepository {
     required int page,
     int limit = 10,
     String? search,
-    ProductFilters filters = ProductFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     ProductSort sort = ProductSort.initial,
   }) async {
     try {
@@ -41,9 +42,15 @@ class ProductsRepositoryImpl implements ProductsRepository {
   }
 
   @override
-  Future<List<ProductCategory>> fetchCategories() async {
+  Future<FilterFacets> fetchFilters(
+    CatalogFilters filters, {
+    String? search,
+  }) async {
     try {
-      return await remoteDataSource.categories();
+      return await remoteDataSource.filterFacets(
+        filters: filters,
+        search: search,
+      );
     } on DioException catch (error) {
       throw mapDioException(error);
     } on FormatException {

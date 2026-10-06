@@ -19,6 +19,7 @@ class BookModel {
     required this.description,
     required this.language,
     required this.category,
+    this.categoryName = '',
     required this.binding,
     required this.price,
     required this.discount,
@@ -38,6 +39,10 @@ class BookModel {
   final String description;
   final String language;
   final String category;
+
+  /// The category's name, or empty when the book has none (or its id matches
+  /// no known category).
+  final String categoryName;
   final String binding;
 
   /// Major units, as the API sends and expects them.
@@ -64,6 +69,7 @@ class BookModel {
       description: asString(json['description']),
       language: asString(json['language']),
       category: asString(json['category']),
+      categoryName: asString(json['category_name']),
       binding: asString(json['binding']),
       price: asDouble(json['price']),
       discount: asDouble(json['discount']),
@@ -96,6 +102,15 @@ class BookModel {
     imageUrl: imageUrl,
   );
 
+  /// Null unless the API sent both a usable id and a name — a book holding a
+  /// retired or unknown id reads as having no category rather than showing a
+  /// bare number.
+  BookCategory? _toCategory() {
+    final parsed = int.tryParse(category);
+    if (parsed == null || parsed <= 0 || categoryName.isEmpty) return null;
+    return BookCategory(id: parsed, name: categoryName);
+  }
+
   BookDetail toDetail() => BookDetail(
     id: id.toString(),
     title: name,
@@ -104,7 +119,7 @@ class BookModel {
     author: author,
     description: description,
     language: BookLanguage.fromCode(language),
-    category: BookCategory.fromId(category),
+    category: _toCategory(),
     binding: BookBinding.fromValue(binding),
     price: price,
     discount: discount,

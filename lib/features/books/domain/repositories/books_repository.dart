@@ -1,6 +1,8 @@
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 
 /// The signed-in account's books, stated without reference to HTTP or JSON.
 ///
@@ -11,9 +13,17 @@ abstract interface class BooksRepository {
     required int page,
     int limit,
     String? search,
-    BookFilters filters,
+    CatalogFilters filters,
     BookSort sort,
   });
+
+  /// What the My Store filter panel can offer if the user keeps [filters] and
+  /// the current [search]: counts per option and the total they would leave.
+  Future<FilterFacets> fetchFilters(CatalogFilters filters, {String? search});
+
+  /// Every category a book can be filed under — the Add/Edit Book form's
+  /// dropdown. The same list My Publishings' categories come from.
+  Future<List<BookCategory>> fetchCategories();
 
   /// One book's full detail — used to prefill the Edit Book form, which
   /// needs fields (sku, description, language, category, ...) the list row

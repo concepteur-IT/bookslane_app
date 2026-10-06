@@ -1,3 +1,4 @@
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
@@ -31,21 +32,22 @@ class FakeProductsRepository implements ProductsRepository {
   /// Records what the quantity endpoint was asked to store.
   final List<({int productId, int quantity})> writes = [];
   final List<
-    ({int page, String? search, ProductFilters filters, ProductSort sort})
+    ({int page, String? search, CatalogFilters filters, ProductSort sort})
   >
   reads = [];
 
-  List<ProductCategory> categories = const [
-    ProductCategory(id: 1001, name: 'Poem'),
-    ProductCategory(id: 1016, name: 'Autobiography'),
-  ];
+  /// The draft each `/filters` request was made for.
+  final List<CatalogFilters> facetReads = [];
+
+  /// Set to make the filter-options call fail.
+  bool facetsFail = false;
 
   @override
   Future<ProductPage> fetchProducts({
     required int page,
     int limit = 10,
     String? search,
-    ProductFilters filters = ProductFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     ProductSort sort = ProductSort.initial,
   }) async {
     reads.add((page: page, search: search, filters: filters, sort: sort));
@@ -61,7 +63,23 @@ class FakeProductsRepository implements ProductsRepository {
   }
 
   @override
-  Future<List<ProductCategory>> fetchCategories() async => categories;
+  Future<FilterFacets> fetchFilters(
+    CatalogFilters filters, {
+    String? search,
+  }) async {
+    facetReads.add(filters);
+    if (facetsFail) throw const ApiFailure('Cannot reach the server.');
+    return FilterFacets(
+      total: 9 - filters.activeCount(const CatalogFilters()),
+      categories: const [
+        FacetOption(id: '1001', label: 'Poem', count: 103),
+        FacetOption(id: '1016', label: 'Autobiography', count: 8),
+      ],
+      inStock: 7,
+      active: 8,
+      inactive: 1,
+    );
+  }
 
   @override
   Future<Product> updateQuantity({
@@ -312,7 +330,9 @@ void main() {
     expect(find.text('37'), findsOneWidget); // the preview still updates
   });
 
-  testWidgets('the filter overlay refetches from the server', (tester) async {
+  testWidgets('the filter overlay is live, and applying refetches', (
+    tester,
+  ) async {
     final repository = FakeProductsRepository();
     await pumpPage(tester, repository);
 
@@ -323,21 +343,29 @@ void main() {
 
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
-    // The category chips are the publisher's own, from fetchCategories.
-    expect(inPanel('Poem'), findsOneWidget);
-    expect(inPanel('Autobiography'), findsOneWidget);
+    // The options and counts are the publisher's own, from /products/filters.
+    expect(inPanel('Poem · 103'), findsOneWidget);
+    expect(inPanel('Autobiography · 8'), findsOneWidget);
+    expect(inPanel('Active · 8'), findsOneWidget);
 
-    await tester.tap(inPanel('Inactive'));
+    await tester.tap(inPanel('Inactive · 1'));
     await tester.tap(find.byType(Switch));
-    await tester.tap(inPanel('Poem'));
+    await tester.tap(inPanel('Poem · 103'));
     await tester.pumpAndSettle();
-    await tester.tap(inPanel('APPLY'));
+
+    // Each change asked the server what the selection leaves.
+    final asked = repository.facetReads.last;
+    expect(asked.isActive, isFalse);
+    expect(asked.inStockOnly, isTrue);
+    expect(asked.categories.single.id, '1001');
+
+    await tester.tap(inPanel('SHOW 6 BOOKS'));
     await tester.pumpAndSettle();
 
     final filters = repository.reads.last.filters;
     expect(filters.isActive, isFalse);
     expect(filters.inStockOnly, isTrue);
-    expect(filters.category?.id, 1001);
+    expect(filters.categories.single.id, '1001');
     expect(repository.reads.last.page, 1);
     expect(find.text('3'), findsOneWidget); // the filter badge
   });
@@ -361,20 +389,16 @@ void main() {
     expect(repository.reads.last.sort, ProductSort.initial);
   });
 
-  testWidgets('a failed category load says so in the panel', (tester) async {
-    final repository = _NoCategories();
+  testWidgets('a failed options load says so, and the list is unaffected', (
+    tester,
+  ) async {
+    final repository = FakeProductsRepository()..facetsFail = true;
     await pumpPage(tester, repository);
 
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
 
-    expect(find.text("Categories couldn't be loaded."), findsOneWidget);
-    expect(find.byType(ProductCard), findsOneWidget, reason: 'list unaffected');
+    expect(find.text("Filter options couldn't be loaded."), findsOneWidget);
+    expect(find.byType(ProductCard), findsOneWidget);
   });
-}
-
-class _NoCategories extends FakeProductsRepository {
-  @override
-  Future<List<ProductCategory>> fetchCategories() async =>
-      throw const ApiFailure('Cannot reach the server.');
 }

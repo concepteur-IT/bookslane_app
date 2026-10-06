@@ -129,9 +129,7 @@ class _NotificationTile extends StatelessWidget {
 
     return Material(
       // Unread rows are tinted so they read as a group at a glance.
-      color: isUnread
-          ? AppColors.inputBackground
-          : AppColors.surfaceBackground,
+      color: isUnread ? AppColors.inputBackground : AppColors.surfaceBackground,
       child: InkWell(
         onTap: onTap,
         child: Padding(

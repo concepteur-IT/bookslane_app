@@ -149,32 +149,34 @@ void main() {
     expect(storage.refresh, 'r-2');
   });
 
-  test('a failed refresh clears tokens and reports the expired session',
-      () async {
-    final storage = FakeTokenStorage(access: 'stale', refresh: 'dead');
-    var expired = false;
+  test(
+    'a failed refresh clears tokens and reports the expired session',
+    () async {
+      final storage = FakeTokenStorage(access: 'stale', refresh: 'dead');
+      var expired = false;
 
-    final adapter = FakeAdapter((options) {
-      return options.path == ApiEndpoints.refresh
-          ? json({'message': 'Invalid refresh token'}, 401)
-          : json({'message': 'Unauthorized'}, 401);
-    });
+      final adapter = FakeAdapter((options) {
+        return options.path == ApiEndpoints.refresh
+            ? json({'message': 'Invalid refresh token'}, 401)
+            : json({'message': 'Unauthorized'}, 401);
+      });
 
-    final dio = clientWith(
-      adapter,
-      storage,
-      onSessionExpired: () => expired = true,
-    );
+      final dio = clientWith(
+        adapter,
+        storage,
+        onSessionExpired: () => expired = true,
+      );
 
-    await expectLater(
-      dio.get<dynamic>(ApiEndpoints.me),
-      throwsA(isA<DioException>()),
-    );
+      await expectLater(
+        dio.get<dynamic>(ApiEndpoints.me),
+        throwsA(isA<DioException>()),
+      );
 
-    expect(expired, isTrue);
-    expect(storage.clearCount, 1);
-    expect(storage.access, isNull);
-  });
+      expect(expired, isTrue);
+      expect(storage.clearCount, 1);
+      expect(storage.access, isNull);
+    },
+  );
 
   test('concurrent 401s trigger exactly one refresh', () async {
     final storage = FakeTokenStorage(access: 'stale', refresh: 'r-1');
@@ -183,10 +185,7 @@ void main() {
     final adapter = FakeAdapter((options) {
       if (options.path == ApiEndpoints.refresh) {
         refreshCalls++;
-        return json({
-          'access_token': 'fresh',
-          'refresh_token': 'r-2',
-        }, 200);
+        return json({'access_token': 'fresh', 'refresh_token': 'r-2'}, 200);
       }
       final auth = options.headers[AppConstants.authorizationHeader];
       return auth == 'Bearer fresh'

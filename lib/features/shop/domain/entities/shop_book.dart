@@ -1,42 +1,69 @@
-/// A book in the Shop — the catalogue a retailer orders from.
-///
-/// MOCKUP: shaped for the design only. Once the Shop API exists, this should
-/// mirror its DTO the way `Product` mirrors `/v1/products`.
+/// Which of the caller's two shelves a [ShopBook] came from. The Shop shows
+/// both at once.
+enum ShopSource {
+  /// My Publishings — a book of one of the account's imprints (thinkerslane).
+  publishing('Publishing'),
+
+  /// My Store — a book the account sells itself.
+  store('Store');
+
+  const ShopSource(this.label);
+
+  final String label;
+
+  static ShopSource fromWire(String? value) =>
+      value == 'store' ? ShopSource.store : ShopSource.publishing;
+}
+
+/// A book in the Shop — one of the caller's own, from either shelf, as `GET
+/// /v1/shop/books` returns it. A trimmed view: only what a catalogue card
+/// shows or acts on.
 class ShopBook {
   const ShopBook({
     required this.id,
+    required this.source,
+    required this.refId,
     required this.title,
     required this.author,
     required this.sku,
-    required this.category,
-    required this.language,
     required this.mrp,
     required this.price,
     required this.stock,
-    required this.addedOn,
-    this.featuredRank = 0,
+    this.isActive = true,
     this.imageUrl,
   });
 
+  /// Unique across both shelves (`publishing-3244`, `store-12`) — a product and
+  /// a store book can share a number.
   final String id;
+
+  final ShopSource source;
+
+  /// The id in its own shelf — what `/v1/products` or `/v1/books` know it by.
+  final int refId;
+
   final String title;
   final String author;
+
+  /// thinkerslane's product code, or the store book's SKU — the card's second
+  /// line.
   final String sku;
-  final ShopCategory category;
-  final ShopLanguage language;
 
   /// List price, struck through when [price] is lower. Major units.
   final double mrp;
 
-  /// What the retailer pays. Major units.
+  /// What a customer pays: the offer price when there is one, else [mrp].
+  /// Major units.
   final double price;
 
+  /// Units on hand.
   final int stock;
-  final DateTime addedOn;
 
-  /// Lower is more prominent; drives the "Featured" sort.
-  final int featuredRank;
+  /// Whether the owner has it switched on. The Shop lists inactive books too
+  /// — it shows everything My Publishings and My Store do — and tags them.
+  final bool isActive;
 
+  /// Absolute cover URL, or null when there is none.
   final String? imageUrl;
 
   bool get isSoldOut => stock <= 0;
@@ -46,120 +73,44 @@ class ShopBook {
   String get formattedMrp => '₹${mrp.toStringAsFixed(2)}';
 }
 
-enum ShopCategory {
-  fiction('Fiction'),
-  nonFiction('Non-fiction'),
-  lifestyle('Lifestyle'),
-  food('Food'),
-  kids('Kids'),
-  poetry('Poetry');
+/// One page of [ShopBook]s, mirroring app-api's `pagination` block.
+class ShopBookPage {
+  const ShopBookPage({
+    required this.items,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalPages,
+    required this.hasNext,
+  });
 
-  const ShopCategory(this.label);
-
-  final String label;
+  final List<ShopBook> items;
+  final int page;
+  final int limit;
+  final int total;
+  final int totalPages;
+  final bool hasNext;
 }
 
-enum ShopLanguage {
-  english('English'),
-  bengali('Bengali'),
-  hindi('Hindi');
-
-  const ShopLanguage(this.label);
-
-  final String label;
-}
-
-/// The options in the sort overlay.
+/// The options in the sort overlay. [value] is what app-api's `sort` param
+/// takes; ordering happens on the server.
 enum ShopSort {
-  featured('Featured'),
-  newest('Newest'),
-  oldest('Oldest'),
-  priceLow('Price: low to high'),
-  priceHigh('Price: high to low'),
-  title('Title: A to Z'),
-  titleDesc('Title: Z to A');
+  featured('Featured', 'featured'),
+  newest('Newest', 'newest'),
+  oldest('Oldest', 'oldest'),
+  priceLow('Price: low to high', 'price_low'),
+  priceHigh('Price: high to low', 'price_high'),
+  title('Title: A to Z', 'title'),
+  titleDesc('Title: Z to A', 'title_desc');
+
+  const ShopSort(this.label, this.value);
 
   /// What Clear goes back to.
   static const ShopSort initial = ShopSort.featured;
 
-  const ShopSort(this.label);
-
   final String label;
-
-  int compare(ShopBook a, ShopBook b) => switch (this) {
-    ShopSort.featured => a.featuredRank.compareTo(b.featuredRank),
-    ShopSort.newest => b.addedOn.compareTo(a.addedOn),
-    ShopSort.oldest => a.addedOn.compareTo(b.addedOn),
-    ShopSort.priceLow => a.price.compareTo(b.price),
-    ShopSort.priceHigh => b.price.compareTo(a.price),
-    ShopSort.title => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-    ShopSort.titleDesc => b.title.toLowerCase().compareTo(
-      a.title.toLowerCase(),
-    ),
-  };
+  final String value;
 }
 
 /// Grid of covers or a denser list of rows.
 enum ShopView { grid, list }
-
-/// Everything the filter overlay can set. Empty sets mean "any".
-///
-/// The starting point is [initial] — in stock only, nothing else — rather
-/// than "no filters", since sold-out books can't be ordered.
-class ShopFilters {
-  const ShopFilters({
-    this.categories = const {},
-    this.languages = const {},
-    this.priceRange,
-    this.inStockOnly = true,
-  });
-
-  /// What the page opens with, and what Reset / Clear filters go back to.
-  static const ShopFilters initial = ShopFilters();
-
-  final Set<ShopCategory> categories;
-  final Set<ShopLanguage> languages;
-
-  /// Null means no price limit.
-  final ({double min, double max})? priceRange;
-
-  final bool inStockOnly;
-
-  /// How many filter groups differ from [initial] — the badge on the filter
-  /// button. The default "in stock only" doesn't count; switching it off does.
-  int get activeCount =>
-      (categories.isNotEmpty ? 1 : 0) +
-      (languages.isNotEmpty ? 1 : 0) +
-      (priceRange != null ? 1 : 0) +
-      (inStockOnly != initial.inStockOnly ? 1 : 0);
-
-  bool get isInitial => activeCount == 0;
-
-  bool matches(ShopBook book) {
-    if (categories.isNotEmpty && !categories.contains(book.category)) {
-      return false;
-    }
-    if (languages.isNotEmpty && !languages.contains(book.language)) {
-      return false;
-    }
-    final range = priceRange;
-    if (range != null && (book.price < range.min || book.price > range.max)) {
-      return false;
-    }
-    if (inStockOnly && book.isSoldOut) return false;
-    return true;
-  }
-
-  ShopFilters copyWith({
-    Set<ShopCategory>? categories,
-    Set<ShopLanguage>? languages,
-    ({double min, double max})? priceRange,
-    bool clearPriceRange = false,
-    bool? inStockOnly,
-  }) => ShopFilters(
-    categories: categories ?? this.categories,
-    languages: languages ?? this.languages,
-    priceRange: clearPriceRange ? null : priceRange ?? this.priceRange,
-    inStockOnly: inStockOnly ?? this.inStockOnly,
-  );
-}

@@ -2,10 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:bookslane_app/core/config/api_endpoints.dart';
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_client.dart';
 import 'package:bookslane_app/features/books/data/models/book_model.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 
 /// Talks to `/v1/books`. Knows about HTTP, multipart and JSON, and nothing
 /// else.
@@ -21,7 +23,7 @@ class BooksRemoteDataSource {
     required int page,
     required int limit,
     String? search,
-    BookFilters filters = BookFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     BookSort sort = BookSort.initial,
   }) async {
     final response = await apiClient.dio.get<dynamic>(
@@ -34,9 +36,7 @@ class BooksRemoteDataSource {
         // Omitted rather than sent empty: the pipe runs with
         // forbidNonWhitelisted, and an empty search would match nothing.
         if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
-        if (filters.isActive != null) 'status': filters.isActive! ? 1 : 0,
-        if (filters.inStockOnly) 'in_stock': 1,
-        if (filters.category != null) 'category': '${filters.category!.id}',
+        ..._filterQuery(filters),
       },
     );
 
@@ -64,6 +64,55 @@ class BooksRemoteDataSource {
     );
 
     return BookModel.fromJson(_asJsonObject(response.data));
+  }
+
+  /// What the filter panel can offer if the user keeps [filters] (and the
+  /// current [search]) — counts per option, from `GET /v1/books/filters`.
+  Future<FilterFacets> filterFacets({
+    required CatalogFilters filters,
+    String? search,
+  }) async {
+    final response = await apiClient.dio.get<dynamic>(
+      ApiEndpoints.bookFilters,
+      queryParameters: <String, dynamic>{
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        ..._filterQuery(filters),
+      },
+    );
+
+    return FilterFacets.fromJson(_asJsonObject(response.data));
+  }
+
+  /// The filters My Store has: status, stock and category. The list and the
+  /// `/filters` endpoint take the same params, which is what keeps the panel's
+  /// "show N" honest.
+  Map<String, dynamic> _filterQuery(CatalogFilters filters) => filters.toQuery(
+    categoryKey: 'category',
+    statusKey: 'status',
+    includeLanguages: false,
+    includePrice: false,
+  );
+
+  /// Every category a book can be filed under — the form's dropdown. (The
+  /// filter panel's options come from [filterFacets] instead.)
+  Future<List<BookCategory>> categories() =>
+      _categoryList(ApiEndpoints.categories);
+
+  Future<List<BookCategory>> _categoryList(String path) async {
+    final response = await apiClient.dio.get<dynamic>(path);
+    final data = _asJsonObject(response.data)['data'];
+    if (data is! List) {
+      throw const FormatException('Category list is missing "data".');
+    }
+
+    return [
+      for (final row in data)
+        if (row is Map<String, dynamic>)
+          BookCategory(
+            id: BookModel.asInt(row['id']),
+            name: BookModel.asString(row['name']).trim(),
+          ),
+    ];
   }
 
   /// Creates a book.

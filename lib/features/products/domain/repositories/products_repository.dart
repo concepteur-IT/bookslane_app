@@ -1,3 +1,4 @@
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/features/products/domain/entities/product.dart';
 
 /// The publisher's catalogue, stated without reference to HTTP or JSON.
@@ -9,13 +10,14 @@ abstract interface class ProductsRepository {
     required int page,
     int limit,
     String? search,
-    ProductFilters filters,
+    CatalogFilters filters,
     ProductSort sort,
   });
 
-  /// The categories the publisher's products are filed under — the options
-  /// for the category filter.
-  Future<List<ProductCategory>> fetchCategories();
+  /// What the My Publishings filter panel can offer if the user keeps
+  /// [filters] and the current [search]: counts per option and the total they
+  /// would leave.
+  Future<FilterFacets> fetchFilters(CatalogFilters filters, {String? search});
 
   /// Sets a product's stock to [quantity] and returns the updated product.
   ///

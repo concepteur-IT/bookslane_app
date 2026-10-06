@@ -100,10 +100,7 @@ abstract final class AppTheme {
 
     final OutlineInputBorder baseBorder = OutlineInputBorder(
       borderRadius: AppRadius.mdAll,
-      borderSide: BorderSide(
-        color: inputBorder,
-        width: AppSizes.borderWidth,
-      ),
+      borderSide: BorderSide(color: inputBorder, width: AppSizes.borderWidth),
     );
 
     return ThemeData(
@@ -345,9 +342,7 @@ abstract final class AppTheme {
           color: AppColors.tooltipBackground,
           borderRadius: AppRadius.xsAll,
         ),
-        textStyle: AppTypography.caption.copyWith(
-          color: AppColors.tooltipText,
-        ),
+        textStyle: AppTypography.caption.copyWith(color: AppColors.tooltipText),
       ),
     );
   }

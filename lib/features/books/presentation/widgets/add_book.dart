@@ -30,6 +30,7 @@ class AddBookForm extends StatefulWidget {
     super.key,
     this.source,
     this.initial,
+    this.categories = const [],
     this.onSubmit,
     this.isSubmitting = false,
   });
@@ -42,6 +43,11 @@ class AddBookForm extends StatefulWidget {
 
   /// The book being edited, or null to add a new one.
   final BookDetail? initial;
+
+  /// What the Category dropdown offers — `GET /v1/categories`. If an edited
+  /// book's own category isn't in it (thinkerslane retired it), it is added
+  /// so the book still shows what it is filed under.
+  final List<BookCategory> categories;
 
   /// Awaited once the form validates. Throwing (e.g. an `ApiFailure`) keeps
   /// the sheet open with every field intact — see `BookListPage._addBook` for
@@ -64,6 +70,7 @@ class AddBookForm extends StatefulWidget {
   /// final draft = await AddBookForm.show(
   ///   context,
   ///   source: widget.source,
+  ///   categories: await provider.formCategories(),
   ///   onSubmit: (draft) => booksRepository.createBook(draft),
   /// );
   /// if (draft == null) return;
@@ -71,9 +78,13 @@ class AddBookForm extends StatefulWidget {
   static Future<BookDraft?> show(
     BuildContext context, {
     required BookSource source,
+    required List<BookCategory> categories,
     required Future<void> Function(BookDraft draft) onSubmit,
   }) {
-    return _showSheet(context, AddBookForm(source: source, onSubmit: onSubmit));
+    return _showSheet(
+      context,
+      AddBookForm(source: source, categories: categories, onSubmit: onSubmit),
+    );
   }
 
   /// Opens the form in a modal sheet, prefilled to edit an existing book —
@@ -83,17 +94,19 @@ class AddBookForm extends StatefulWidget {
   /// final draft = await AddBookForm.showEdit(
   ///   context,
   ///   initial: detail,
+  ///   categories: await provider.formCategories(),
   ///   onSubmit: (draft) => booksRepository.updateBook(detail.id, draft),
   /// );
   /// ```
   static Future<BookDraft?> showEdit(
     BuildContext context, {
     required BookDetail initial,
+    required List<BookCategory> categories,
     required Future<void> Function(BookDraft draft) onSubmit,
   }) {
     return _showSheet(
       context,
-      AddBookForm(initial: initial, onSubmit: onSubmit),
+      AddBookForm(initial: initial, categories: categories, onSubmit: onSubmit),
     );
   }
 
@@ -155,6 +168,15 @@ class _AddBookFormState extends State<AddBookForm> {
   bool _isSubmitting = false;
 
   bool get _isEditing => widget.initial != null;
+
+  /// The dropdown's options: the fetched list, plus the edited book's own
+  /// category when that list no longer has it.
+  List<BookCategory> get _categoryOptions {
+    final own = widget.initial?.category;
+    return own == null || widget.categories.contains(own)
+        ? widget.categories
+        : [own, ...widget.categories];
+  }
 
   @override
   void initState() {
@@ -394,7 +416,7 @@ class _AddBookFormState extends State<AddBookForm> {
           const SizedBox(height: AppSpacing.labelGap),
           AppDropdownField<BookCategory>(
             value: _category,
-            items: BookCategory.values,
+            items: _categoryOptions,
             labelBuilder: (category) => category.label,
             hintText: 'Select a category',
             prefixIcon: Icons.category_outlined,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/features/products/domain/entities/product.dart';
 import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
@@ -15,6 +16,10 @@ enum ProductsStatus { initial, loading, ready, error }
 /// Search, filter, sort and paging are all server-side — each change refetches
 /// rather than filtering a local list, so the counts always match the API.
 class ProductsProvider extends ChangeNotifier {
+  /// What the My Publishings filter panel offers: status, stock and category —
+  /// one category at a time, matching My Store.
+  static const FilterSpec filterSpec = FilterSpec(status: true);
+
   ProductsProvider(this._repository, {this.pageSize = 10});
 
   final ProductsRepository _repository;
@@ -25,15 +30,8 @@ class ProductsProvider extends ChangeNotifier {
   String? _errorMessage;
 
   String _search = '';
-  ProductFilters _filters = ProductFilters.initial;
+  CatalogFilters _filters = filterSpec.initial;
   ProductSort _sort = ProductSort.initial;
-
-  /// Options for the category filter; empty until [loadCategories] lands.
-  List<ProductCategory> _categories = const [];
-  bool _categoriesFailed = false;
-
-  /// The categories call can land after the page is closed.
-  bool _disposed = false;
   int _currentPage = 1;
 
   /// Typing shouldn't fire a request per keystroke.
@@ -47,12 +45,7 @@ class ProductsProvider extends ChangeNotifier {
   List<Product> get products => _page?.items ?? const [];
   String? get errorMessage => _errorMessage;
   String get search => _search;
-  ProductFilters get filters => _filters;
-  List<ProductCategory> get categories => _categories;
-
-  /// True when the category list couldn't be fetched — the filter panel says
-  /// so rather than showing an empty section.
-  bool get categoriesFailed => _categoriesFailed;
+  CatalogFilters get filters => _filters;
   ProductSort get sort => _sort;
   int get currentPage => _currentPage;
   int get totalPages => _page?.totalPages ?? 1;
@@ -63,24 +56,17 @@ class ProductsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _disposed = true;
     _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> load() => Future.wait([_fetch(), loadCategories()]);
+  Future<void> load() => _fetch();
 
-  /// Fetches the category filter's options. A failure here never blocks the
-  /// list; it only leaves the section empty with a note.
-  Future<void> loadCategories() async {
-    try {
-      _categories = await _repository.fetchCategories();
-      _categoriesFailed = false;
-    } on ApiFailure {
-      _categoriesFailed = true;
-    }
-    if (!_disposed) notifyListeners();
-  }
+  /// What the filter panel can offer if the user keeps [draft] — counts per
+  /// option and the total it would leave, for the current search. Throws
+  /// [ApiFailure]. The panel calls this on every change to its draft.
+  Future<FilterFacets> loadFacets(CatalogFilters draft) =>
+      _repository.fetchFilters(draft, search: _search);
 
   Future<void> refresh() => _fetch();
 
@@ -95,7 +81,7 @@ class ProductsProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> setFilters(ProductFilters filters) {
+  Future<void> setFilters(CatalogFilters filters) {
     _filters = filters;
     // Any query change restarts at page one, or you can sit on page 3 of a
     // two-page result and see nothing.

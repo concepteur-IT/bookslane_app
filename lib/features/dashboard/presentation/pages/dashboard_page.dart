@@ -7,6 +7,7 @@ import 'package:bookslane_app/features/auth/presentation/providers/auth_provider
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
 import 'package:bookslane_app/features/books/presentation/pages/books_hub_page.dart';
+import 'package:bookslane_app/features/cart/presentation/providers/cart_provider.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/coming_soon_tab.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/home_tab.dart';
@@ -27,6 +28,13 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _navIndex = 0;
+
+  /// The Shop cart. Owned here, in the shell, so it outlives tab switches and
+  /// is dropped on sign-out (this page is replaced by the sign-in screen).
+  final CartProvider _cart = CartProvider();
+
+  /// The Shop is the third tab.
+  static const int _shopIndex = 2;
 
   /// Null while the Books tab is on its hub; set once a shelf is chosen.
   /// Keeping it here (rather than pushing a route) is what leaves the bottom
@@ -90,21 +98,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget get _body => switch (_navIndex) {
     0 => const HomeTab(),
-    1 => _bookSource == null
-        ? BooksHubPage(
-            onSourceSelected: (source) =>
-                setState(() => _bookSource = source),
-          )
-        // BookListPage routes each shelf to its API: My Store to /v1/books,
-        // My Publishings to /v1/products (the thinkerslane catalogue).
-        : BookListPage(
-            // A key per shelf, so switching shelves rebuilds the state
-            // instead of carrying the previous search and page across.
-            key: ValueKey(_bookSource),
-            source: _bookSource!,
-            onBack: () => setState(() => _bookSource = null),
-          ),
-    2 => const ShopPage(),
+    1 =>
+      _bookSource == null
+          ? BooksHubPage(
+              onSourceSelected: (source) =>
+                  setState(() => _bookSource = source),
+            )
+          // BookListPage routes each shelf to its API: My Store to /v1/books,
+          // My Publishings to /v1/products (the thinkerslane catalogue).
+          : BookListPage(
+              // A key per shelf, so switching shelves rebuilds the state
+              // instead of carrying the previous search and page across.
+              key: ValueKey(_bookSource),
+              source: _bookSource!,
+              onBack: () => setState(() => _bookSource = null),
+            ),
+    _shopIndex => const ShopPage(),
     3 => const ComingSoonTab(
       title: 'Orders',
       icon: Icons.receipt_long_outlined,
@@ -184,7 +193,31 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   @override
+  void dispose() {
+    _cart.dispose();
+    super.dispose();
+  }
+
+  void _openCart() {
+    // No cart screen or checkout yet — see CartProvider.
+    AppToast.info(
+      context,
+      _cart.isEmpty
+          ? 'Your cart is empty.'
+          : '${_cart.count} ${_cart.count == 1 ? 'item' : 'items'} in your '
+                'cart — checkout is coming soon.',
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider<CartProvider>.value(
+      value: _cart,
+      child: _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.screenBackground,
       // Inner pages (a shelf, later an order) supply their own bar with a
@@ -192,11 +225,23 @@ class _DashboardPageState extends State<DashboardPage> {
       // row of height.
       appBar: _isInnerPage
           ? null
-          : DashboardAppBar(
-              section: _section,
-              notificationCount: _unreadCount,
-              onNotificationsPressed: _openNotifications,
-              onLogoutPressed: _confirmLogout,
+          : PreferredSize(
+              preferredSize: const Size.fromHeight(DashboardAppBar.height),
+              // Only the bar listens to the cart, so adding a book doesn't
+              // rebuild the whole shell.
+              child: ListenableBuilder(
+                listenable: _cart,
+                builder: (context, _) => DashboardAppBar(
+                  section: _section,
+                  notificationCount: _unreadCount,
+                  onNotificationsPressed: _openNotifications,
+                  onLogoutPressed: _confirmLogout,
+                  // On the Shop a cart takes the sign-out button's place;
+                  // every other tab keeps sign-out.
+                  cartCount: _cart.count,
+                  onCartPressed: _navIndex == _shopIndex ? _openCart : null,
+                ),
+              ),
             ),
       body: SafeArea(top: false, child: _body),
       bottomNavigationBar: NavigationBar(

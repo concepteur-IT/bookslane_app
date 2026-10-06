@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
@@ -9,6 +10,8 @@ import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
+
+import 'test_categories.dart';
 
 /// Stands in for `/v1/books/:id` (GET and PATCH) — one book, held as full
 /// detail so [getBook] has something real to prefill the Edit Book form
@@ -30,11 +33,20 @@ class _FakeBooksRepository implements BooksRepository {
   );
 
   @override
+  Future<List<BookCategory>> fetchCategories() async => testCategories;
+
+  @override
+  Future<FilterFacets> fetchFilters(
+    CatalogFilters filters, {
+    String? search,
+  }) async => const FilterFacets(total: 0);
+
+  @override
   Future<BookPage> fetchBooks({
     required int page,
     int limit = 10,
     String? search,
-    BookFilters filters = BookFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     BookSort sort = BookSort.initial,
   }) async => BookPage(
     items: [_asListRow],
@@ -98,7 +110,7 @@ void main() {
         author: 'Narayan K. Ramaswami',
         description: 'An edited description of the book.',
         language: BookLanguage.english,
-        category: BookCategory.fiction,
+        category: testNonFiction,
         binding: BookBinding.paperback,
         price: 199.5,
         discount: 0,
@@ -143,6 +155,41 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('a retired category still shows on the edit form', (
+    tester,
+  ) async {
+    // thinkerslane dropped category 77, but this book is still filed under it.
+    final detail = repository._detail;
+    repository = _FakeBooksRepository(
+      BookDetail(
+        id: detail.id,
+        title: detail.title,
+        subtitle: detail.subtitle,
+        sku: detail.sku,
+        author: detail.author,
+        description: detail.description,
+        language: detail.language,
+        category: const BookCategory(id: 77, name: 'Retired Shelf'),
+        binding: detail.binding,
+        price: detail.price,
+        discount: detail.discount,
+        discountType: detail.discountType,
+        effectivePrice: detail.effectivePrice,
+        quantity: detail.quantity,
+        status: detail.status,
+      ),
+    );
+    await pumpList(tester);
+
+    await tester.tap(find.byTooltip('Edit'));
+    await tester.pumpAndSettle();
+
+    // Selected in the dropdown even though the fetched list lacks it — and
+    // not an assertion failure from a value with no matching item.
+    expect(tester.takeException(), isNull);
+    expect(find.text('Retired Shelf'), findsOneWidget);
+  });
+
   testWidgets('tapping the eye icon shows the book\'s full details', (
     tester,
   ) async {
@@ -159,7 +206,7 @@ void main() {
     expect(find.text('BL-EDIT-01'), findsOneWidget);
     expect(find.text('Narayan K. Ramaswami'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
-    expect(find.text('Fiction'), findsOneWidget);
+    expect(find.text('Non-fiction'), findsOneWidget);
     expect(find.text('Paperback'), findsOneWidget);
     // Card price + dialog's Price row + dialog's Selling price row (equal,
     // since this book has no discount).
@@ -182,10 +229,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Edit book'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Malgudi Nights'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'A short story collection'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Malgudi Nights'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(TextFormField, 'A short story collection'),
+      findsOneWidget,
+    );
     expect(find.widgetWithText(TextFormField, 'BL-EDIT-01'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, 'Narayan K. Ramaswami'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Narayan K. Ramaswami'),
+      findsOneWidget,
+    );
     expect(
       find.widgetWithText(TextFormField, 'An edited description of the book.'),
       findsOneWidget,
@@ -193,7 +249,7 @@ void main() {
     expect(find.widgetWithText(TextFormField, '199.50'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '8'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
-    expect(find.text('Fiction'), findsOneWidget);
+    expect(find.text('Non-fiction'), findsOneWidget);
     expect(find.text('Paperback'), findsOneWidget);
     expect(find.text('SAVE CHANGES'), findsOneWidget);
 

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
@@ -14,6 +15,8 @@ import 'package:bookslane_app/features/books/domain/entities/book_form_options.d
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/book_card.dart';
+
+import 'test_categories.dart';
 
 /// Stands in for `/v1/books` — an in-memory list, shaped the way
 /// [BookModel.toEntity] would produce it, without a server. [BooksProvider]
@@ -24,11 +27,20 @@ class _FakeBooksRepository implements BooksRepository {
   int _nextId = 1;
 
   @override
+  Future<List<BookCategory>> fetchCategories() async => testCategories;
+
+  @override
+  Future<FilterFacets> fetchFilters(
+    CatalogFilters filters, {
+    String? search,
+  }) async => const FilterFacets(total: 0);
+
+  @override
   Future<BookPage> fetchBooks({
     required int page,
     int limit = 10,
     String? search,
-    BookFilters filters = BookFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     BookSort sort = BookSort.initial,
   }) async {
     return BookPage(
@@ -71,7 +83,8 @@ class _FakeBooksRepository implements BooksRepository {
   Future<BookDetail> getBook(String id) => throw UnimplementedError();
 
   @override
-  Future<Book> updateBook(String id, BookDraft draft) => throw UnimplementedError();
+  Future<Book> updateBook(String id, BookDraft draft) =>
+      throw UnimplementedError();
 }
 
 /// A 1x1 PNG — enough for `Image.memory` to decode a real thumbnail.
@@ -197,7 +210,7 @@ void main() {
     await enter(tester, '10', '7');
 
     await selectDropdown<BookLanguage>(tester, 'English');
-    await selectDropdown<BookCategory>(tester, 'Fiction');
+    await selectDropdown<BookCategory>(tester, 'Non-fiction');
     await selectDropdown<BookBinding>(tester, 'Hardcover');
 
     await reveal(tester, find.text('ADD BOOK'));

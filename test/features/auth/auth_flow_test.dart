@@ -51,10 +51,7 @@ Widget app(AuthProvider provider) => ChangeNotifierProvider.value(
 );
 
 Future<void> signIn(WidgetTester tester) async {
-  await tester.enterText(
-    find.byType(AppTextField).first,
-    'anna@bookslane.com',
-  );
+  await tester.enterText(find.byType(AppTextField).first, 'anna@bookslane.com');
   await tester.enterText(find.byType(AppTextField).last, 'hunter2');
   await tester.tap(find.text('SIGN IN'));
 }
@@ -68,8 +65,9 @@ void main() {
   }
 
   group('startup', () {
-    testWidgets('shows the splash while the session is being checked',
-        (tester) async {
+    testWidgets('shows the splash while the session is being checked', (
+      tester,
+    ) async {
       final provider = AuthProvider(FakeAuthRepository());
       await pumpApp(tester, provider);
 
@@ -86,8 +84,9 @@ void main() {
       expect(find.byType(DashboardPage), findsNothing);
     });
 
-    testWidgets('a stored session opens the dashboard directly',
-        (tester) async {
+    testWidgets('a stored session opens the dashboard directly', (
+      tester,
+    ) async {
       final provider = AuthProvider(FakeAuthRepository(storedUser: _user))
         ..bootstrap();
       await pumpApp(tester, provider);
@@ -115,8 +114,9 @@ void main() {
       expect(provider.user, _user);
     });
 
-    testWidgets('the button shows a spinner while the request is in flight',
-        (tester) async {
+    testWidgets('the button shows a spinner while the request is in flight', (
+      tester,
+    ) async {
       final provider = AuthProvider(FakeAuthRepository())..bootstrap();
       await pumpApp(tester, provider);
       await tester.pumpAndSettle();
@@ -128,8 +128,9 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('a rejected sign-in shows a toast and stays put',
-        (tester) async {
+    testWidgets('a rejected sign-in shows a toast and stays put', (
+      tester,
+    ) async {
       final repository = FakeAuthRepository(
         failure: const AuthFailure(
           'Incorrect email or password.',
@@ -200,8 +201,9 @@ void main() {
   });
 
   group('session expiry', () {
-    testWidgets('a failed refresh mid-session bounces to login',
-        (tester) async {
+    testWidgets('a failed refresh mid-session bounces to login', (
+      tester,
+    ) async {
       final provider = AuthProvider(FakeAuthRepository(storedUser: _user))
         ..bootstrap();
       await pumpApp(tester, provider);

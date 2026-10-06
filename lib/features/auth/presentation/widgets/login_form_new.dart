@@ -64,7 +64,9 @@ class _LoginPageState extends State<LoginPage> {
                 return SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -74,7 +76,8 @@ class _LoginPageState extends State<LoginPage> {
                           emailController: _emailController,
                           passwordController: _passwordController,
                           obscure: _obscure,
-                          onToggleObscure: () => setState(() => _obscure = !_obscure),
+                          onToggleObscure: () =>
+                              setState(() => _obscure = !_obscure),
                           onSignIn: _signIn,
                         ),
                       ],
@@ -162,7 +165,11 @@ class _Logo extends StatelessWidget {
               children: const [
                 Padding(
                   padding: EdgeInsets.only(right: 16),
-                  child: Icon(Icons.menu_book_rounded, size: 22, color: _C.navy),
+                  child: Icon(
+                    Icons.menu_book_rounded,
+                    size: 22,
+                    color: _C.navy,
+                  ),
                 ),
                 Padding(
                   padding: EdgeInsets.only(left: 8),
@@ -267,7 +274,7 @@ class _Card extends StatelessWidget {
               autofillHints: const [AutofillHints.password],
               onFieldSubmitted: (_) => onSignIn(),
               validator: (value) =>
-              (value ?? '').isEmpty ? 'Enter your password' : null,
+                  (value ?? '').isEmpty ? 'Enter your password' : null,
               suffix: IconButton(
                 onPressed: onToggleObscure,
                 splashRadius: 22,
@@ -463,7 +470,11 @@ class _SignInButton extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 12),
-                Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ],
             ),
           ),

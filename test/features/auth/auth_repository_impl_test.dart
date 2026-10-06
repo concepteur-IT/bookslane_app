@@ -139,10 +139,12 @@ void main() {
         t.repo.login(email: 'anna@bookslane.com', password: 'wrong'),
         throwsA(
           isA<AuthFailure>()
-              .having((f) => f.kind, 'kind',
-                  AuthFailureKind.invalidCredentials)
-              .having((f) => f.message, 'message',
-                  'Incorrect email or password.'),
+              .having((f) => f.kind, 'kind', AuthFailureKind.invalidCredentials)
+              .having(
+                (f) => f.message,
+                'message',
+                'Incorrect email or password.',
+              ),
         ),
       );
       expect(t.store.access, isNull);
@@ -154,8 +156,11 @@ void main() {
       await expectLater(
         t.repo.login(email: 'anna@bookslane.com', password: 'hunter2'),
         throwsA(
-          isA<AuthFailure>()
-              .having((f) => f.kind, 'kind', AuthFailureKind.server),
+          isA<AuthFailure>().having(
+            (f) => f.kind,
+            'kind',
+            AuthFailureKind.server,
+          ),
         ),
       );
     });
@@ -202,10 +207,8 @@ void main() {
 
     test('rejects a payload with no user', () {
       expect(
-        () => LoginResponse.fromJson({
-          'access_token': 'a',
-          'refresh_token': 'r',
-        }),
+        () =>
+            LoginResponse.fromJson({'access_token': 'a', 'refresh_token': 'r'}),
         throwsFormatException,
       );
     });

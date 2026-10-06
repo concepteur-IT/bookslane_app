@@ -1,88 +1,103 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/core/widgets/widgets.dart';
-import 'package:bookslane_app/features/shop/domain/entities/sample_shop_books.dart';
+import 'package:bookslane_app/features/cart/presentation/providers/cart_provider.dart';
 import 'package:bookslane_app/features/shop/domain/entities/shop_book.dart';
+import 'package:bookslane_app/features/shop/domain/repositories/shop_repository.dart';
+import 'package:bookslane_app/features/shop/presentation/providers/shop_provider.dart';
 import 'package:bookslane_app/features/shop/presentation/widgets/shop_book_tile.dart';
-import 'package:bookslane_app/features/shop/presentation/widgets/shop_panels.dart';
 
-/// The Shop tab: the catalogue to order from, as a grid of covers or a list.
+/// The Shop tab: the account's two shelves — My Publishings and My Store — as
+/// one list of books (or a grid of covers). Each card says which shelf it came
+/// from. Search, filters, sort and paging all run on the server —
+/// `GET /v1/shop/books`, with the filter panel's options from
+/// `GET /v1/shop/filters`.
 ///
-/// MOCKUP: runs over [SampleShopBooks] in memory, and "View details" and "Add
-/// to cart" only toast. The branded app bar and bottom bar come from
-/// DashboardPage, so this is just the body under them.
-class ShopPage extends StatefulWidget {
+/// "Add to cart" fills the in-memory [CartProvider] (the count on the app
+/// bar); "View details" still only toasts, as there is no details screen or
+/// checkout yet. The branded app bar and bottom bar come from DashboardPage,
+/// so this is just the body under them.
+class ShopPage extends StatelessWidget {
   const ShopPage({super.key});
 
   @override
-  State<ShopPage> createState() => _ShopPageState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<ShopProvider>(
+      create: (_) => ShopProvider(context.read<ShopRepository>())..load(),
+      child: const _ShopView(),
+    );
+  }
 }
 
-class _ShopPageState extends State<ShopPage> {
+class _ShopView extends StatefulWidget {
+  const _ShopView();
+
+  @override
+  State<_ShopView> createState() => _ShopViewState();
+}
+
+class _ShopViewState extends State<_ShopView> {
   /// The filter and sort overlays drop down from under this row.
   final GlobalKey _toolbarKey = GlobalKey();
 
-  final List<ShopBook> _books = SampleShopBooks.all;
-
-  String _query = '';
-  ShopFilters _filters = ShopFilters.initial;
-  ShopSort _sort = ShopSort.initial;
   // List only for now — the grid/list toggle in build() is commented out.
   // Not final: the commented-out toggle writes it.
   // ignore: prefer_final_fields
   ShopView _view = ShopView.list;
 
-  List<ShopBook> _matching(ShopFilters filters) {
-    final query = _query.trim().toLowerCase();
-    return _books.where((book) {
-      if (!filters.matches(book)) return false;
-      if (query.isEmpty) return true;
-      return book.title.toLowerCase().contains(query) ||
-          book.author.toLowerCase().contains(query) ||
-          book.sku.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  List<ShopBook> get _visible => _matching(_filters)..sort(_sort.compare);
-
   Future<void> _openFilters() async {
-    final filters = await showAnchoredPanel<ShopFilters>(
+    final provider = context.read<ShopProvider>();
+    final filters = await showAnchoredPanel<CatalogFilters>(
       context: context,
       anchor: _toolbarKey,
-      builder: (_) => ShopFilterPanel(
-        initial: _filters,
-        maxPrice: SampleShopBooks.maxPrice,
-        countFor: (draft) => _matching(draft).length,
+      builder: (_) => DynamicFilterPanel(
+        spec: ShopProvider.filterSpec,
+        initial: provider.filters,
+        loadFacets: provider.loadFacets,
       ),
     );
-    if (filters != null) setState(() => _filters = filters);
+    if (filters != null) await provider.setFilters(filters);
   }
 
   Future<void> _openSort() async {
+    final provider = context.read<ShopProvider>();
     final sort = await showAnchoredPanel<ShopSort>(
       context: context,
       anchor: _toolbarKey,
       maxWidth: 280,
       builder: (_) => SortPanel<ShopSort>(
         options: ShopSort.values,
-        selected: _sort,
+        selected: provider.sort,
         initial: ShopSort.initial,
         labelOf: (sort) => sort.label,
       ),
     );
-    if (sort != null) setState(() => _sort = sort);
+    if (sort != null) await provider.setSort(sort);
   }
 
   void _viewDetails(ShopBook book) =>
       AppToast.info(context, 'Details for ${book.title} — coming soon.');
 
-  void _addToCart(ShopBook book) =>
-      AppToast.success(context, '${book.title} added to cart.');
+  void _addToCart(ShopBook book) {
+    switch (context.read<CartProvider>().add(book)) {
+      case CartAddResult.added:
+        AppToast.success(context, '${book.title} added to cart.');
+      case CartAddResult.atStockLimit:
+        AppToast.info(
+          context,
+          'Only ${book.stock} of ${book.title} in stock — all are in your cart.',
+        );
+      case CartAddResult.soldOut:
+        AppToast.info(context, '${book.title} is sold out.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final visible = _visible;
+    final provider = context.watch<ShopProvider>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,9 +113,11 @@ class _ShopPageState extends State<ShopPage> {
             // On the row itself, not the padding, so overlays line up with
             // the search box and the last button rather than the screen edge.
             key: _toolbarKey,
-            filterCount: _filters.activeCount,
-            isSorted: _sort != ShopSort.initial,
-            onSearchChanged: (value) => setState(() => _query = value),
+            filterCount: provider.filters.activeCount(
+              ShopProvider.filterSpec.initial,
+            ),
+            isSorted: provider.sort != ShopSort.initial,
+            onSearchChanged: provider.setSearch,
             onFilterPressed: _openFilters,
             onSortPressed: _openSort,
             // Grid/list toggle — disabled for now, the Shop shows the list
@@ -124,24 +141,78 @@ class _ShopPageState extends State<ShopPage> {
         ),
 
         Expanded(
-          child: visible.isEmpty
-              ? _EmptyState(
-                  canClear: !_filters.isInitial,
-                  onClear: () => setState(() => _filters = ShopFilters.initial),
-                )
-              : _view == ShopView.grid
-              ? _Grid(
-                  books: visible,
-                  onViewDetails: _viewDetails,
-                  onAddToCart: _addToCart,
-                )
-              : _List(
-                  books: visible,
-                  onViewDetails: _viewDetails,
-                  onAddToCart: _addToCart,
-                ),
+          child: _Body(
+            provider: provider,
+            view: _view,
+            onViewDetails: _viewDetails,
+            onAddToCart: _addToCart,
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// Loading, error, empty and the listing itself.
+class _Body extends StatelessWidget {
+  const _Body({
+    required this.provider,
+    required this.view,
+    required this.onViewDetails,
+    required this.onAddToCart,
+  });
+
+  final ShopProvider provider;
+  final ShopView view;
+  final ValueChanged<ShopBook> onViewDetails;
+  final ValueChanged<ShopBook> onAddToCart;
+
+  @override
+  Widget build(BuildContext context) {
+    // First load only: later refetches keep the list on screen and dim it, so
+    // paging doesn't flash an empty page.
+    if (provider.status == ShopStatus.loading && provider.books.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (provider.status == ShopStatus.error) {
+      return _ErrorState(
+        message: provider.errorMessage ?? 'Something went wrong.',
+        onRetry: provider.refresh,
+      );
+    }
+
+    if (provider.books.isEmpty) {
+      return _EmptyState(
+        canClear: !provider.filters.isInitial(ShopProvider.filterSpec.initial),
+        onClear: () => provider.setFilters(ShopProvider.filterSpec.initial),
+      );
+    }
+
+    final footer = PaginationBar(
+      shown: provider.books.length,
+      total: provider.total,
+      page: provider.currentPage,
+      pageCount: provider.totalPages,
+      onPrevious: provider.hasPrevious ? provider.previousPage : null,
+      onNext: provider.hasNext ? provider.nextPage : null,
+    );
+
+    return Opacity(
+      opacity: provider.isLoading ? 0.5 : 1,
+      child: view == ShopView.grid
+          ? _Grid(
+              books: provider.books,
+              footer: footer,
+              onViewDetails: onViewDetails,
+              onAddToCart: onAddToCart,
+            )
+          : _List(
+              books: provider.books,
+              footer: footer,
+              onViewDetails: onViewDetails,
+              onAddToCart: onAddToCart,
+            ),
     );
   }
 }
@@ -162,11 +233,13 @@ const EdgeInsets _listingPadding = EdgeInsets.fromLTRB(
 class _Grid extends StatelessWidget {
   const _Grid({
     required this.books,
+    required this.footer,
     required this.onViewDetails,
     required this.onAddToCart,
   });
 
   final List<ShopBook> books;
+  final Widget footer;
   final ValueChanged<ShopBook> onViewDetails;
   final ValueChanged<ShopBook> onAddToCart;
 
@@ -176,9 +249,10 @@ class _Grid extends StatelessWidget {
 
     return ListView.separated(
       padding: _listingPadding,
-      itemCount: rowCount,
+      itemCount: rowCount + 1,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.lg),
       itemBuilder: (context, row) {
+        if (row == rowCount) return footer;
         final left = books[row * 2];
         final right = row * 2 + 1 < books.length ? books[row * 2 + 1] : null;
 
@@ -206,11 +280,13 @@ class _Grid extends StatelessWidget {
 class _List extends StatelessWidget {
   const _List({
     required this.books,
+    required this.footer,
     required this.onViewDetails,
     required this.onAddToCart,
   });
 
   final List<ShopBook> books;
+  final Widget footer;
   final ValueChanged<ShopBook> onViewDetails;
   final ValueChanged<ShopBook> onAddToCart;
 
@@ -218,9 +294,10 @@ class _List extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: _listingPadding,
-      itemCount: books.length,
+      itemCount: books.length + 1,
       separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (context, index) {
+        if (index == books.length) return footer;
         final book = books[index];
         return ShopBookListRow(
           book: book,
@@ -265,6 +342,40 @@ class _EmptyState extends StatelessWidget {
                 child: const Text('CLEAR FILTERS'),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: AppSizes.logoTile,
+              color: AppColors.disabledText,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyLarge,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            OutlinedButton(onPressed: onRetry, child: const Text('TRY AGAIN')),
           ],
         ),
       ),

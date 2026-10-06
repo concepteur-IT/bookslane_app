@@ -20,6 +20,7 @@ export 'book_cover.dart';
 export 'choice_chip_button.dart';
 export 'pagination_bar.dart';
 export 'cta_button.dart';
+export 'dynamic_filter_panel.dart';
 export 'field_label.dart';
 export 'image_picker_field.dart';
 export 'inner_page_app_bar.dart';

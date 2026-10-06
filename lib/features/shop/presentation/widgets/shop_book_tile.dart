@@ -52,7 +52,7 @@ class ShopBookGridTile extends StatelessWidget {
         // lines, so both prices sit on the same baseline.
         const Spacer(),
         const SizedBox(height: AppSpacing.xs),
-        _SkuText(book.sku),
+        _MetaRow(book: book),
 
         const SizedBox(height: AppSpacing.xs),
 
@@ -108,15 +108,7 @@ class ShopBookListRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 _TitleText(book.title),
                 const SizedBox(height: AppSpacing.xxs),
-                Row(
-                  children: [
-                    Flexible(child: _SkuText(book.sku)),
-                    if (book.isSoldOut) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      const _SoldOutTag(),
-                    ],
-                  ],
-                ),
+                _MetaRow(book: book, showSoldOut: true),
                 const SizedBox(height: AppSpacing.xs),
                 _PriceBlock(book: book),
               ],
@@ -184,6 +176,40 @@ class _TitleText extends StatelessWidget {
         color: AppColors.headingText,
         height: 1.25,
       ),
+    );
+  }
+}
+
+/// The SKU and which shelf the book came from — "Publishing" or "Store" —
+/// since the Shop shows both together. A Wrap, so a long SKU never forces an
+/// overflow on a narrow card.
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.book, this.showSoldOut = false});
+
+  final ShopBook book;
+
+  /// The list row tags sold-out books here; the grid tags the cover instead.
+  final bool showSoldOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xxs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _SkuText(book.sku),
+        StatusPill(
+          label: book.source.label,
+          // Not the grey of "Inactive" beside it.
+          color: book.source == ShopSource.store
+              ? AppColors.infoText
+              : AppColors.brandPrimary,
+        ),
+        if (!book.isActive)
+          const StatusPill(label: 'Inactive', color: AppColors.secondaryText),
+        if (showSoldOut && book.isSoldOut) const _SoldOutTag(),
+      ],
     );
   }
 }
@@ -269,7 +295,7 @@ class _CartButton extends StatelessWidget {
               width: _size,
               height: _size,
               child: Icon(
-                Icons.shopping_bag_outlined,
+                Icons.add_rounded,
                 size: AppSizes.iconSm,
                 color: AppColors.inverseText,
               ),

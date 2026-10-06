@@ -23,4 +23,22 @@ abstract final class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String books = '/books';
   static String book(String id) => '/books/$id';
+
+  /// What the My Store filter panel can offer for a selection — takes the
+  /// list's filter params.
+  static const String bookFilters = '/books/filters';
+
+  // ---------------------------------------------------------------------------
+  // Categories — app-api/src/categories/categories.controller.ts
+  // Every category a book can be filed under; shared by both shelves.
+  // ---------------------------------------------------------------------------
+  static const String categories = '/categories';
+
+  // ---------------------------------------------------------------------------
+  // Shop — app-api/src/shop/shop.controller.ts
+  // thinkerslane's public catalogue; the filters endpoint takes the list's
+  // filter params and returns what the panel can offer.
+  // ---------------------------------------------------------------------------
+  static const String shopBooks = '/shop/books';
+  static const String shopFilters = '/shop/filters';
 }

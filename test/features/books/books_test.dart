@@ -1,3 +1,4 @@
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
@@ -93,7 +94,7 @@ class _FakeProducts implements ProductsRepository {
     required int page,
     int limit = 10,
     String? search,
-    ProductFilters filters = ProductFilters.initial,
+    CatalogFilters filters = const CatalogFilters(),
     ProductSort sort = ProductSort.initial,
   }) async {
     pagesRead.add(page);
@@ -118,7 +119,10 @@ class _FakeProducts implements ProductsRepository {
   }
 
   @override
-  Future<List<ProductCategory>> fetchCategories() async => const [];
+  Future<FilterFacets> fetchFilters(
+    CatalogFilters filters, {
+    String? search,
+  }) async => const FilterFacets(total: 0);
 
   @override
   Future<Product> updateQuantity({

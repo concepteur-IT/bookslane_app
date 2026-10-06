@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_detail.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
+import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 
 /// What the list is doing right now.
@@ -15,6 +17,10 @@ enum BooksStatus { initial, loading, ready, error }
 /// by `/v1/books` — plus the query that produced it. [ProductsProvider] is
 /// the same shape for `My Publishings` over `/v1/products`.
 class BooksProvider extends ChangeNotifier {
+  /// What the My Store filter panel offers: status, stock and category — one
+  /// category at a time, since app-api's list takes a single one.
+  static const FilterSpec filterSpec = FilterSpec(status: true);
+
   BooksProvider(this._repository, {this.pageSize = 10});
 
   final BooksRepository _repository;
@@ -25,9 +31,13 @@ class BooksProvider extends ChangeNotifier {
   String? _errorMessage;
 
   String _search = '';
-  BookFilters _filters = BookFilters.initial;
+  CatalogFilters _filters = filterSpec.initial;
   BookSort _sort = BookSort.initial;
   int _currentPage = 1;
+
+  /// Every category, for the Add/Edit Book form. Fetched on first use and kept
+  /// — the list only changes when thinkerslane's does.
+  List<BookCategory>? _formCategories;
 
   /// Typing shouldn't fire a request per keystroke.
   Timer? _searchDebounce;
@@ -44,7 +54,7 @@ class BooksProvider extends ChangeNotifier {
 
   String? get errorMessage => _errorMessage;
   String get search => _search;
-  BookFilters get filters => _filters;
+  CatalogFilters get filters => _filters;
   BookSort get sort => _sort;
   int get currentPage => _currentPage;
   int get totalPages => _page?.totalPages ?? 1;
@@ -61,6 +71,17 @@ class BooksProvider extends ChangeNotifier {
 
   Future<void> load() => _fetch();
 
+  /// What the filter panel can offer if the user keeps [draft] — counts per
+  /// option and the total it would leave, for the current search. Throws
+  /// [ApiFailure]. The panel calls this on every change to its draft.
+  Future<FilterFacets> loadFacets(CatalogFilters draft) =>
+      _repository.fetchFilters(draft, search: _search);
+
+  /// Every category a book can be filed under, for the Add/Edit Book form.
+  /// Throws [ApiFailure] if it can't be fetched (and tries again next time).
+  Future<List<BookCategory>> formCategories() async =>
+      _formCategories ??= await _repository.fetchCategories();
+
   Future<void> refresh() => _fetch();
 
   void setSearch(String value) {
@@ -74,7 +95,7 @@ class BooksProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> setFilters(BookFilters filters) {
+  Future<void> setFilters(CatalogFilters filters) {
     _filters = filters;
     // Any query change restarts at page one, or you can sit on page 3 of a
     // two-page result and see nothing.
@@ -111,7 +132,7 @@ class BooksProvider extends ChangeNotifier {
     final book = await _repository.createBook(draft);
 
     _search = '';
-    _filters = BookFilters.initial;
+    _filters = filterSpec.initial;
     _sort = BookSort.initial;
     _currentPage = 1;
     await _fetch();

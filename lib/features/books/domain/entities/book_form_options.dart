@@ -1,12 +1,11 @@
-/// The fixed choice lists behind the Add Book form's dropdowns.
+/// The choice lists behind the Add Book form's dropdowns.
 ///
 /// Each enum carries both the label shown in the dropdown and the value the
 /// API expects, so the form never maps between the two by hand.
 ///
-/// Categories and languages are hard-coded for now. When app-api grows
-/// `GET /v1/categories` and `GET /v1/languages`, swap [BookCategory.values]
-/// and [BookLanguage.values] for the fetched lists — the form already takes
-/// its items from a list, so only the source changes.
+/// Languages are still hard-coded; when app-api grows `GET /v1/languages`,
+/// swap [BookLanguage.values] for the fetched list. Categories already come
+/// from the API — see [BookCategory].
 library;
 
 /// `language` on the products table. The value is a BCP-47 code.
@@ -32,37 +31,26 @@ enum BookLanguage {
   }
 }
 
-/// `category` on the products table. The value is the numeric category id.
-enum BookCategory {
-  fiction('Fiction', 1),
-  nonFiction('Non-fiction', 2),
-  academic('Academic & Textbooks', 3),
-  childrens("Children's", 4),
-  biography('Biography & Memoir', 5),
-  business('Business & Economics', 6),
-  selfHelp('Self-help', 7),
-  history('History', 8),
-  science('Science & Technology', 9),
-  religion('Religion & Spirituality', 10),
-  poetry('Poetry', 11),
-  comics('Comics & Graphic Novels', 12),
-  reference('Reference', 13);
+/// A category a book can be filed under — one option from
+/// `GET /v1/categories`.
+///
+/// These are thinkerslane's own categories (bookslane keeps a copy), the same
+/// ones My Publishings filters by, so an [id] means the same thing on both
+/// shelves. Equality is by [id]: the instance on a book and the one in the
+/// fetched list are the same category.
+class BookCategory {
+  const BookCategory({required this.id, required this.name});
 
-  const BookCategory(this.label, this.id);
-
-  final String label;
   final int id;
+  final String name;
 
-  /// Null when [id] doesn't parse or match any of these — see
-  /// [BookLanguage.fromCode] for the same fallback.
-  static BookCategory? fromId(String? id) {
-    final parsed = int.tryParse(id ?? '');
-    if (parsed == null) return null;
-    for (final category in values) {
-      if (category.id == parsed) return category;
-    }
-    return null;
-  }
+  String get label => name;
+
+  @override
+  bool operator ==(Object other) => other is BookCategory && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 /// `binding` on the products table — how the book is bound.

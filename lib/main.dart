@@ -13,6 +13,9 @@ import 'package:bookslane_app/features/books/data/datasources/books_remote_datas
 import 'package:bookslane_app/features/books/data/repositories/books_repository_impl.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
 import 'package:bookslane_app/features/products/data/datasources/products_remote_datasource.dart';
+import 'package:bookslane_app/features/shop/data/datasources/shop_remote_datasource.dart';
+import 'package:bookslane_app/features/shop/data/repositories/shop_repository_impl.dart';
+import 'package:bookslane_app/features/shop/domain/repositories/shop_repository.dart';
 import 'package:bookslane_app/features/products/data/repositories/products_repository_impl.dart';
 import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
 
@@ -32,6 +35,7 @@ class _BooksLaneState extends State<BooksLane> {
   late final ApiClient _apiClient;
   late final ProductsRepository _productsRepository;
   late final BooksRepository _booksRepository;
+  late final ShopRepository _shopRepository;
 
   @override
   void initState() {
@@ -62,6 +66,10 @@ class _BooksLaneState extends State<BooksLane> {
       remoteDataSource: BooksRemoteDataSource(apiClient: _apiClient),
     );
 
+    _shopRepository = ShopRepositoryImpl(
+      remoteDataSource: ShopRemoteDataSource(apiClient: _apiClient),
+    );
+
     _authProvider = AuthProvider(repository);
     // Checks the stored token; the splash stays up until it answers.
     _authProvider.bootstrap();
@@ -80,6 +88,7 @@ class _BooksLaneState extends State<BooksLane> {
         ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
         Provider<ProductsRepository>.value(value: _productsRepository),
         Provider<BooksRepository>.value(value: _booksRepository),
+        Provider<ShopRepository>.value(value: _shopRepository),
       ],
       child: MaterialApp(
         title: AppConstants.appName,

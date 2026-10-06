@@ -95,7 +95,10 @@ class _ImagePickerFieldState extends FormFieldState<XFile> {
             const SizedBox(height: AppSpacing.sm),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: Text('Choose from gallery', style: AppTypography.bodyLarge),
+              title: Text(
+                'Choose from gallery',
+                style: AppTypography.bodyLarge,
+              ),
               onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
             ),
             ListTile(
@@ -172,10 +175,7 @@ class _ImagePickerFieldView extends StatelessWidget {
               top: AppSpacing.xs,
               left: AppSpacing.sm,
             ),
-            child: Text(
-              state.widget.helperText!,
-              style: AppTypography.caption,
-            ),
+            child: Text(state.widget.helperText!, style: AppTypography.caption),
           ),
       ],
     );

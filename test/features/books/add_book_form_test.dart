@@ -6,6 +6,8 @@ import 'package:bookslane_app/features/books/domain/entities/book_draft.dart';
 import 'package:bookslane_app/features/books/domain/entities/book_form_options.dart';
 import 'package:bookslane_app/features/books/presentation/widgets/add_book.dart';
 
+import 'test_categories.dart';
+
 void main() {
   BookDraft? submitted;
 
@@ -23,7 +25,10 @@ void main() {
         home: Scaffold(
           body: SingleChildScrollView(
             padding: AppSpacing.pagePadding,
-            child: AddBookForm(onSubmit: (draft) async => submitted = draft),
+            child: AddBookForm(
+              categories: testCategories,
+              onSubmit: (draft) async => submitted = draft,
+            ),
           ),
         ),
       ),
@@ -37,11 +42,7 @@ void main() {
   }
 
   /// Fills a text field by the hint its label sits above.
-  Future<void> enter(
-    WidgetTester tester,
-    String hint,
-    String value,
-  ) async {
+  Future<void> enter(WidgetTester tester, String hint, String value) async {
     final field = find.widgetWithText(TextFormField, hint);
     await tester.ensureVisible(field);
     await tester.enterText(field, value);
@@ -99,10 +100,10 @@ void main() {
     expect(find.byType(DropdownButtonFormField<BookCategory>), findsOneWidget);
 
     await selectDropdown<BookLanguage>(tester, 'Bengali');
-    await selectDropdown<BookCategory>(tester, 'Poetry');
+    await selectDropdown<BookCategory>(tester, 'Poem');
 
     expect(find.text('Bengali'), findsOneWidget);
-    expect(find.text('Poetry'), findsOneWidget);
+    expect(find.text('Poem'), findsOneWidget);
   });
 
   testWidgets('a flat discount above the price is rejected', (tester) async {
@@ -126,10 +127,7 @@ void main() {
     await selectDropdown<DiscountType>(tester, 'Percentage (%)');
     await tapSubmit(tester);
 
-    expect(
-      find.text('A percentage discount cannot exceed 90'),
-      findsOneWidget,
-    );
+    expect(find.text('A percentage discount cannot exceed 90'), findsOneWidget);
     expect(submitted, isNull);
   });
 
@@ -146,7 +144,7 @@ void main() {
     await enter(tester, '0', '50');
 
     await selectDropdown<BookLanguage>(tester, 'English');
-    await selectDropdown<BookCategory>(tester, 'Fiction');
+    await selectDropdown<BookCategory>(tester, 'Non-fiction');
     await selectDropdown<BookBinding>(tester, 'Hardcover');
 
     await tapSubmit(tester);
@@ -168,7 +166,7 @@ void main() {
       sku: 'BL-0042',
       author: 'R. K. Narayan',
       language: BookLanguage.english,
-      category: BookCategory.fiction,
+      category: testNonFiction,
       binding: BookBinding.hardcover,
       price: 250,
       quantity: 12,
@@ -182,7 +180,7 @@ void main() {
       'sku': 'BL-0042',
       'author': 'R. K. Narayan',
       'language': 'en',
-      'category': 1,
+      'category': 1018,
       'description': '',
       'binding': 'hardcover',
       'price': 250.0,

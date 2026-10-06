@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bookslane_app/core/config/config.dart';
+import 'package:bookslane_app/core/filters/catalog_filters.dart';
 import 'package:bookslane_app/core/network/api_client.dart';
 import 'package:bookslane_app/core/network/api_failure.dart';
 import 'package:bookslane_app/core/storage/token_storage.dart';
@@ -166,10 +167,10 @@ void main() {
         page: 2,
         limit: 10,
         search: '  tagore  ',
-        filters: const ProductFilters(
+        filters: CatalogFilters(
           isActive: false,
           inStockOnly: true,
-          category: ProductCategory(id: 1001, name: 'Poem'),
+          categories: {const FacetOption(id: '1001', label: 'Poem')},
         ),
         sort: ProductSort.titleDesc,
       );
@@ -180,7 +181,7 @@ void main() {
       expect(query['search'], 'tagore'); // trimmed
       expect(query['is_active'], 0);
       expect(query['in_stock'], 1);
-      expect(query['category_id'], 1001);
+      expect(query['category_id'], '1001');
       expect(query['sort'], 'name');
       expect(query['order'], 'DESC');
     });
@@ -207,25 +208,58 @@ void main() {
       }
     });
 
-    test('parses the category options', () async {
-      final t = build(
-        (_) => (
-          status: 200,
-          body: {
-            'data': [
-              {'id': 1001, 'name': ' Poem ', 'product_count': '103'},
-              {'id': 1016, 'name': 'Autobiography', 'product_count': 8},
-            ],
+    test('several categories go as one comma-separated list', () async {
+      final t = build((_) => (status: 200, body: listJson([])));
+
+      await t.repo.fetchProducts(
+        page: 1,
+        filters: CatalogFilters(
+          categories: {
+            const FacetOption(id: '1004', label: 'Thriller'),
+            const FacetOption(id: '1001', label: 'Poem'),
           },
         ),
       );
 
-      final categories = await t.repo.fetchCategories();
+      expect(
+        t.adapter.requests.single.queryParameters['category_id'],
+        '1001,1004',
+      );
+    });
 
-      expect(t.adapter.requests.single.path, endsWith('/products/categories'));
-      expect(categories.map((c) => c.name), ['Poem', 'Autobiography']);
-      expect(categories.first.id, 1001);
-      expect(categories.first.productCount, 103); // string from the wire
+    test('the filter panel\'s options come from /products/filters', () async {
+      final t = build(
+        (_) => (
+          status: 200,
+          body: {
+            'total': 129,
+            'categories': [
+              {'id': 1001, 'name': ' Poem ', 'count': '103'},
+            ],
+            'languages': [
+              {'value': 'Bengali', 'count': 120},
+            ],
+            'price': {'min': 36, 'max': 1485},
+            'stock': {'in_stock': 100},
+            'status': {'active': 515, 'inactive': 129},
+          },
+        ),
+      );
+
+      // The very params the list takes — that is what makes "SHOW N" honest.
+      final facets = await t.repo.fetchFilters(
+        CatalogFilters(isActive: false),
+        search: ' tagore ',
+      );
+
+      final request = t.adapter.requests.single;
+      expect(request.path, endsWith('/products/filters'));
+      expect(request.queryParameters, {'search': 'tagore', 'is_active': 0});
+      expect(facets.total, 129);
+      expect(facets.categories.single.label, 'Poem');
+      expect(facets.categories.single.count, 103); // string coerced
+      expect(facets.inactive, 129);
+      expect(facets.price, (min: 36.0, max: 1485.0));
     });
 
     test('omits search and the filter params when not set', () async {

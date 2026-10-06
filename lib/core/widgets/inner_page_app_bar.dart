@@ -42,9 +42,8 @@ class InnerPageAppBar extends StatelessWidget implements PreferredSizeWidget {
   static const double _searchHeight = 80;
 
   @override
-  Size get preferredSize => Size.fromHeight(
-    _barHeight + (searchField == null ? 0 : _searchHeight),
-  );
+  Size get preferredSize =>
+      Size.fromHeight(_barHeight + (searchField == null ? 0 : _searchHeight));
 
   @override
   Widget build(BuildContext context) {

@@ -71,9 +71,10 @@ class LoginPage extends StatelessWidget {
                           Expanded(
                             child: _FormSheet(
                               child: LoginForm(
-                                isSubmitting: context.select<AuthProvider, bool>(
-                                  (auth) => auth.isSubmitting,
-                                ),
+                                isSubmitting: context
+                                    .select<AuthProvider, bool>(
+                                      (auth) => auth.isSubmitting,
+                                    ),
                                 onSubmit: (email, password) =>
                                     _signIn(context, email, password),
                                 onForgotPassword: () {},
@@ -117,10 +118,7 @@ class _Branding extends StatelessWidget {
             // The artwork runs to the edge of its own canvas, so it fills the
             // tile edge to edge; clipping keeps it inside the tile's shape.
             clipBehavior: Clip.antiAlias,
-            child: Image.asset(
-              AppAssets.logo,
-              fit: BoxFit.contain,
-            ),
+            child: Image.asset(AppAssets.logo, fit: BoxFit.contain),
           ),
 
           const SizedBox(height: AppSpacing.lg),
