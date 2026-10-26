@@ -38,6 +38,10 @@ class CartProvider extends ChangeNotifier {
   /// book count as two.
   int get count => _lines.values.fold(0, (sum, line) => sum + line.quantity);
 
+  /// Sum of price × quantity, in major units.
+  double get total =>
+      _lines.values.fold(0.0, (sum, l) => sum + l.book.price * l.quantity);
+
   bool get isEmpty => _lines.isEmpty;
 
   int quantityOf(ShopBook book) => _lines[book.id]?.quantity ?? 0;
@@ -53,6 +57,23 @@ class CartProvider extends ChangeNotifier {
     _lines[book.id] = CartLine(book: book, quantity: have + 1);
     notifyListeners();
     return CartAddResult.added;
+  }
+
+  /// Takes one of [book] out; the line goes when the last unit does.
+  void decrement(ShopBook book) {
+    final have = quantityOf(book);
+    if (have == 0) return;
+    if (have == 1) {
+      _lines.remove(book.id);
+    } else {
+      _lines[book.id] = CartLine(book: book, quantity: have - 1);
+    }
+    notifyListeners();
+  }
+
+  /// Takes every unit of [book] out.
+  void remove(ShopBook book) {
+    if (_lines.remove(book.id) != null) notifyListeners();
   }
 
   void clear() {

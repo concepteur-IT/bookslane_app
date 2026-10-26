@@ -41,4 +41,31 @@ abstract final class ApiEndpoints {
   // ---------------------------------------------------------------------------
   static const String shopBooks = '/shop/books';
   static const String shopFilters = '/shop/filters';
+
+  // ---------------------------------------------------------------------------
+  // Orders — app-api/src/orders/orders.controller.ts
+  // POST places an order (book ids, quantities, a flat discount; the server
+  // prices every line and takes publishing stock off thinkerslane). GET lists
+  // the caller's orders.
+  // ---------------------------------------------------------------------------
+  static const String orders = '/orders';
+
+  /// Saves the customer an order is for (users, role 7); returns their id.
+  static const String customers = '/customers';
+
+  /// What the Orders filter panel can offer for a selection — takes the
+  /// list's filter params.
+  static const String orderFilters = '/orders/filters';
+
+  // ---------------------------------------------------------------------------
+  // Profile — app-api/src/profile/profile.controller.ts
+  // The signed-in owner's own `users` row (no password).
+  // ---------------------------------------------------------------------------
+  static const String profile = '/profile';
+
+  // ---------------------------------------------------------------------------
+  // Dashboard — app-api/src/dashboard/dashboard.controller.ts
+  // The Home tab: name, an IST greeting, today's orders and revenue, products.
+  // ---------------------------------------------------------------------------
+  static const String dashboardSummary = '/dashboard/summary';
 }

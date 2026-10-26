@@ -12,6 +12,13 @@ import 'package:bookslane_app/features/auth/presentation/widgets/auth_gate.dart'
 import 'package:bookslane_app/features/books/data/datasources/books_remote_datasource.dart';
 import 'package:bookslane_app/features/books/data/repositories/books_repository_impl.dart';
 import 'package:bookslane_app/features/books/domain/repositories/books_repository.dart';
+import 'package:bookslane_app/features/dashboard/data/dashboard_repository_impl.dart';
+import 'package:bookslane_app/features/dashboard/domain/dashboard_summary.dart';
+import 'package:bookslane_app/features/orders/data/datasources/orders_remote_datasource.dart';
+import 'package:bookslane_app/features/orders/data/repositories/orders_repository_impl.dart';
+import 'package:bookslane_app/features/orders/domain/repositories/orders_repository.dart';
+import 'package:bookslane_app/features/profile/data/profile_repository_impl.dart';
+import 'package:bookslane_app/features/profile/domain/repositories/profile_repository.dart';
 import 'package:bookslane_app/features/products/data/datasources/products_remote_datasource.dart';
 import 'package:bookslane_app/features/shop/data/datasources/shop_remote_datasource.dart';
 import 'package:bookslane_app/features/shop/data/repositories/shop_repository_impl.dart';
@@ -36,6 +43,9 @@ class _BooksLaneState extends State<BooksLane> {
   late final ProductsRepository _productsRepository;
   late final BooksRepository _booksRepository;
   late final ShopRepository _shopRepository;
+  late final OrdersRepository _ordersRepository;
+  late final ProfileRepository _profileRepository;
+  late final DashboardRepository _dashboardRepository;
 
   @override
   void initState() {
@@ -70,6 +80,14 @@ class _BooksLaneState extends State<BooksLane> {
       remoteDataSource: ShopRemoteDataSource(apiClient: _apiClient),
     );
 
+    _ordersRepository = OrdersRepositoryImpl(
+      remoteDataSource: OrdersRemoteDataSource(apiClient: _apiClient),
+    );
+
+    _profileRepository = ProfileRepositoryImpl(apiClient: _apiClient);
+
+    _dashboardRepository = DashboardRepositoryImpl(apiClient: _apiClient);
+
     _authProvider = AuthProvider(repository);
     // Checks the stored token; the splash stays up until it answers.
     _authProvider.bootstrap();
@@ -89,6 +107,9 @@ class _BooksLaneState extends State<BooksLane> {
         Provider<ProductsRepository>.value(value: _productsRepository),
         Provider<BooksRepository>.value(value: _booksRepository),
         Provider<ShopRepository>.value(value: _shopRepository),
+        Provider<OrdersRepository>.value(value: _ordersRepository),
+        Provider<ProfileRepository>.value(value: _profileRepository),
+        Provider<DashboardRepository>.value(value: _dashboardRepository),
       ],
       child: MaterialApp(
         title: AppConstants.appName,

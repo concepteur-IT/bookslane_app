@@ -14,10 +14,10 @@ class GreetingBanner extends StatelessWidget {
   /// "Good morning, Anna"
   final String greeting;
 
-  /// "You have 4 visits today"
+  /// "3 orders today"
   final String headline;
 
-  /// "Performance up 12% this week"
+  /// "₹1,240.00 revenue today"; the row is left out when empty.
   final String note;
 
   @override
@@ -61,26 +61,28 @@ class GreetingBanner extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: AppSpacing.md),
+                  if (note.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
 
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.trending_up_rounded,
-                        size: AppSizes.iconMd,
-                        color: AppColors.brandHeaderSubtitleText,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Flexible(
-                        child: Text(
-                          note,
-                          style: AppTypography.bodyLarge.copyWith(
-                            color: AppColors.brandHeaderSubtitleText,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.trending_up_rounded,
+                          size: AppSizes.iconMd,
+                          color: AppColors.brandHeaderSubtitleText,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            note,
+                            style: AppTypography.bodyLarge.copyWith(
+                              color: AppColors.brandHeaderSubtitleText,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

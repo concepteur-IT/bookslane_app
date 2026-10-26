@@ -31,6 +31,14 @@ class ShopBook {
     required this.stock,
     this.isActive = true,
     this.imageUrl,
+    this.language = '',
+    this.binding = '',
+    this.isbn = '',
+    this.publisherName = '',
+    this.pageCount = 0,
+    this.publishYear,
+    this.categories = const [],
+    this.description = '',
   });
 
   /// Unique across both shelves (`publishing-3244`, `store-12`) — a product and
@@ -65,6 +73,19 @@ class ShopBook {
 
   /// Absolute cover URL, or null when there is none.
   final String? imageUrl;
+
+  // Shown only in the details dialog. Either shelf may leave any of them
+  // blank, so each is optional and the dialog prints a dash.
+  final String language;
+  final String binding;
+  final String isbn;
+  final String publisherName;
+  final int pageCount;
+  final int? publishYear;
+  final List<String> categories;
+
+  /// Plain text — the model strips the HTML thinkerslane stores.
+  final String description;
 
   bool get isSoldOut => stock <= 0;
   bool get isDiscounted => price < mrp;

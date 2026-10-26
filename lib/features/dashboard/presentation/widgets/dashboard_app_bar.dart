@@ -13,6 +13,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onNotificationsPressed,
     this.onLogoutPressed,
     this.cartCount = 0,
+    this.showNotifications = true,
     this.onCartPressed,
   });
 
@@ -31,6 +32,10 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Units in the cart — the badge on the cart button.
   final int cartCount;
+
+  /// Whether the bell is drawn. Off hides it without removing the
+  /// notifications panel behind it, so it can be switched back on.
+  final bool showNotifications;
 
   /// Also the offset the notifications dropdown hangs from.
   static const double height = 72;
@@ -83,15 +88,16 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
 
-                _BadgedCircleButton(
-                  icon: Icons.notifications_none_rounded,
-                  tooltip: 'Notifications',
-                  count: notificationCount,
-                  onPressed: onNotificationsPressed,
-                ),
+                if (showNotifications)
+                  _BadgedCircleButton(
+                    icon: Icons.notifications_none_rounded,
+                    tooltip: 'Notifications',
+                    count: notificationCount,
+                    onPressed: onNotificationsPressed,
+                  ),
 
                 if (onCartPressed != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
+                  if (showNotifications) const SizedBox(width: AppSpacing.xs),
                   _BadgedCircleButton(
                     icon: Icons.shopping_cart_outlined,
                     tooltip: 'Cart',
@@ -99,7 +105,7 @@ class DashboardAppBar extends StatelessWidget implements PreferredSizeWidget {
                     onPressed: onCartPressed,
                   ),
                 ] else if (onLogoutPressed != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
+                  if (showNotifications) const SizedBox(width: AppSpacing.xs),
                   IconButton(
                     onPressed: onLogoutPressed,
                     tooltip: 'Log out',

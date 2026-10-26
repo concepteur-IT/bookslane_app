@@ -21,10 +21,12 @@ class ShopProvider extends ChangeNotifier {
   /// What the Shop filter panel offers: status, price, stock, category and
   /// language — several categories and languages may be picked.
   ///
-  /// It opens with **no filter on**, so the Shop lists exactly what My
-  /// Publishings and My Store list together: a default such as "in stock
-  /// only" would quietly hide most of an owner's books (and did).
+  /// It opens with **"In stock only" on** — the Shop is for ordering, and a
+  /// sold-out book can't be. That means it lists fewer books than My
+  /// Publishings and My Store together until the switch is turned off; Reset
+  /// in the panel goes back to this, not to "no filter".
   static const FilterSpec filterSpec = FilterSpec(
+    initial: CatalogFilters(inStockOnly: true),
     status: true,
     price: true,
     languages: true,

@@ -8,6 +8,7 @@ import 'package:bookslane_app/features/cart/presentation/providers/cart_provider
 import 'package:bookslane_app/features/shop/domain/entities/shop_book.dart';
 import 'package:bookslane_app/features/shop/domain/repositories/shop_repository.dart';
 import 'package:bookslane_app/features/shop/presentation/providers/shop_provider.dart';
+import 'package:bookslane_app/features/shop/presentation/widgets/shop_book_details_dialog.dart';
 import 'package:bookslane_app/features/shop/presentation/widgets/shop_book_tile.dart';
 
 /// The Shop tab: the account's two shelves — My Publishings and My Store — as
@@ -17,9 +18,9 @@ import 'package:bookslane_app/features/shop/presentation/widgets/shop_book_tile.
 /// `GET /v1/shop/filters`.
 ///
 /// "Add to cart" fills the in-memory [CartProvider] (the count on the app
-/// bar); "View details" still only toasts, as there is no details screen or
-/// checkout yet. The branded app bar and bottom bar come from DashboardPage,
-/// so this is just the body under them.
+/// bar); "View details" opens a dialog from the row already loaded. The
+/// branded app bar and bottom bar come from DashboardPage, so this is just
+/// the body under them.
 class ShopPage extends StatelessWidget {
   const ShopPage({super.key});
 
@@ -78,8 +79,7 @@ class _ShopViewState extends State<_ShopView> {
     if (sort != null) await provider.setSort(sort);
   }
 
-  void _viewDetails(ShopBook book) =>
-      AppToast.info(context, 'Details for ${book.title} — coming soon.');
+  void _viewDetails(ShopBook book) => ShopBookDetailsDialog.show(context, book);
 
   void _addToCart(ShopBook book) {
     switch (context.read<CartProvider>().add(book)) {

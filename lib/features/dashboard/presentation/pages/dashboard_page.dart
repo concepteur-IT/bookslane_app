@@ -7,12 +7,14 @@ import 'package:bookslane_app/features/auth/presentation/providers/auth_provider
 import 'package:bookslane_app/features/books/domain/entities/book.dart';
 import 'package:bookslane_app/features/books/presentation/pages/book_list_page.dart';
 import 'package:bookslane_app/features/books/presentation/pages/books_hub_page.dart';
+import 'package:bookslane_app/features/cart/presentation/pages/cart_page.dart';
 import 'package:bookslane_app/features/cart/presentation/providers/cart_provider.dart';
-import 'package:bookslane_app/features/dashboard/presentation/widgets/coming_soon_tab.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/dashboard_app_bar.dart';
 import 'package:bookslane_app/features/dashboard/presentation/widgets/home_tab.dart';
 import 'package:bookslane_app/features/notifications/presentation/notifications_overlay.dart';
 import 'package:bookslane_app/features/notifications/presentation/widgets/app_notification.dart';
+import 'package:bookslane_app/features/orders/presentation/pages/orders_page.dart';
+import 'package:bookslane_app/features/profile/presentation/pages/profile_page.dart';
 import 'package:bookslane_app/features/shop/presentation/pages/shop_page.dart';
 
 /// The signed-in shell: app bar, the bottom bar, and whichever tab is open.
@@ -114,14 +116,8 @@ class _DashboardPageState extends State<DashboardPage> {
               onBack: () => setState(() => _bookSource = null),
             ),
     _shopIndex => const ShopPage(),
-    3 => const ComingSoonTab(
-      title: 'Orders',
-      icon: Icons.receipt_long_outlined,
-    ),
-    _ => const ComingSoonTab(
-      title: 'Profile',
-      icon: Icons.person_outline_rounded,
-    ),
+    3 => const OrdersPage(),
+    _ => const ProfilePage(),
   };
 
   void _onDestinationSelected(int index) {
@@ -199,13 +195,13 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openCart() {
-    // No cart screen or checkout yet — see CartProvider.
-    AppToast.info(
-      context,
-      _cart.isEmpty
-          ? 'Your cart is empty.'
-          : '${_cart.count} ${_cart.count == 1 ? 'item' : 'items'} in your '
-                'cart — checkout is coming soon.',
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChangeNotifierProvider<CartProvider>.value(
+          value: _cart,
+          child: const CartPage(),
+        ),
+      ),
     );
   }
 
@@ -233,6 +229,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 listenable: _cart,
                 builder: (context, _) => DashboardAppBar(
                   section: _section,
+                  // The bell is switched off for now. The panel, the feed and
+                  // _openNotifications are all kept — set this to true to bring
+                  // it back.
+                  showNotifications: false,
                   notificationCount: _unreadCount,
                   onNotificationsPressed: _openNotifications,
                   onLogoutPressed: _confirmLogout,

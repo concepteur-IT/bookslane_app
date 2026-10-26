@@ -15,6 +15,14 @@ class ShopBookModel {
     required this.stock,
     this.isActive = true,
     this.imageUrl,
+    this.language = '',
+    this.binding = '',
+    this.isbn = '',
+    this.publisherName = '',
+    this.pageCount = 0,
+    this.publishYear,
+    this.categories = const [],
+    this.description = '',
   });
 
   final String id;
@@ -28,6 +36,14 @@ class ShopBookModel {
   final int stock;
   final bool isActive;
   final String? imageUrl;
+  final String language;
+  final String binding;
+  final String isbn;
+  final String publisherName;
+  final int pageCount;
+  final int? publishYear;
+  final List<String> categories;
+  final String description;
 
   factory ShopBookModel.fromJson(Map<String, dynamic> json) {
     final image = json['image_url'];
@@ -56,6 +72,19 @@ class ShopBookModel {
       // Absent from an old server: treat as active rather than tag it.
       isActive: json['is_active'] == null || jsonInt(json['is_active']) == 1,
       imageUrl: image is String && image.isNotEmpty ? image : null,
+      language: jsonString(json['language']).trim(),
+      binding: jsonString(json['binding']).trim(),
+      isbn: jsonString(json['isbn']).trim(),
+      publisherName: jsonString(json['publisher_name']).trim(),
+      pageCount: jsonInt(json['page_count']),
+      publishYear: jsonInt(json['publish_year']) > 0
+          ? jsonInt(json['publish_year'])
+          : null,
+      categories: [
+        if (json['categories'] is List)
+          for (final c in json['categories'] as List) jsonString(c),
+      ],
+      description: _plainText(json['description']),
     );
   }
 
@@ -71,7 +100,38 @@ class ShopBookModel {
     stock: stock,
     isActive: isActive,
     imageUrl: imageUrl,
+    language: language,
+    binding: binding,
+    isbn: isbn,
+    publisherName: publisherName,
+    pageCount: pageCount,
+    publishYear: publishYear,
+    categories: categories,
+    description: description,
   );
+}
+
+/// thinkerslane stores descriptions as HTML. Paragraphs and line breaks become
+/// newlines, every other tag is dropped and the common entities decoded.
+String _plainText(Object? value) {
+  final html = jsonString(value);
+  if (html.isEmpty) return '';
+
+  return html
+      .replaceAll(RegExp(r'</p>|</div>', caseSensitive: false), '\n\n')
+      .replaceAll(RegExp(r'<br\s*/?>|</li>', caseSensitive: false), '\n')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      // Last, so '&amp;lt;' stays the literal text '&lt;'.
+      .replaceAll('&amp;', '&')
+      .replaceAll(RegExp(r'[ \t]+'), ' ')
+      .replaceAll(RegExp(r' *\n *'), '\n')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
 }
 
 /// Wire format of the shop list response — `data` plus the `pagination` block.

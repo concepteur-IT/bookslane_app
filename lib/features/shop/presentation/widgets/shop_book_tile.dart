@@ -199,6 +199,7 @@ class _MetaRow extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         _SkuText(book.sku),
+        if (!book.isSoldOut) _StockText(book.stock),
         StatusPill(
           label: book.source.label,
           // Not the grey of "Inactive" beside it.
@@ -210,6 +211,26 @@ class _MetaRow extends StatelessWidget {
           const StatusPill(label: 'Inactive', color: AppColors.secondaryText),
         if (showSoldOut && book.isSoldOut) const _SoldOutTag(),
       ],
+    );
+  }
+}
+
+/// Units available — "5 in stock". Sold-out books carry the Sold out tag
+/// instead.
+class _StockText extends StatelessWidget {
+  const _StockText(this.stock);
+
+  final int stock;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '$stock in stock',
+      maxLines: 1,
+      style: AppTypography.caption.copyWith(
+        color: AppColors.successText,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 }
