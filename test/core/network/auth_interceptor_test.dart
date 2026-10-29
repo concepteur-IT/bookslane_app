@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bookslane_app/core/config/config.dart';
+import 'package:bookslane_app/core/device/device_identity.dart';
 import 'package:bookslane_app/core/network/api_client.dart';
 import 'package:bookslane_app/core/network/auth_interceptor.dart';
 import 'package:bookslane_app/core/storage/token_storage.dart';
@@ -115,6 +116,62 @@ void main() {
       adapter.requests[1].headers.containsKey(AppConstants.authorizationHeader),
       isFalse,
     );
+  });
+
+  test('version and platform ride on every request, refresh included', () async {
+    final storage = FakeTokenStorage(access: 'stale', refresh: 'r-1');
+    final adapter = FakeAdapter((options) {
+      if (options.path == ApiEndpoints.refresh) {
+        return json({
+          'access_token': 'fresh',
+          'refresh_token': 'r-2',
+          'token_type': 'Bearer',
+          'expires_in': 900,
+        }, 200);
+      }
+      final auth = options.headers[AppConstants.authorizationHeader];
+      return auth == 'Bearer fresh'
+          ? json({'id': 'u1'}, 200)
+          : json({'message': 'Unauthorized'}, 401);
+    });
+
+    final api = ApiClient(
+      config: config,
+      storage: storage,
+      device: const DeviceIdentity(
+        deviceId: 'device-id-123',
+        platform: 'macos',
+        appVersion: '1.2.3+45',
+      ),
+    );
+    api.dio.httpClientAdapter = adapter;
+    // The interceptor builds its own refresh Dio; point that one at the fake too.
+    final interceptor = api.dio.interceptors.whereType<AuthInterceptor>().single;
+    // ignore: invalid_use_of_visible_for_testing_member
+    interceptor.refreshClientForTest.httpClientAdapter = adapter;
+
+    await api.dio.get<dynamic>(ApiEndpoints.me);
+
+    // original, refresh, replay
+    expect(adapter.requests.map((r) => r.path), [
+      ApiEndpoints.me,
+      ApiEndpoints.refresh,
+      ApiEndpoints.me,
+    ]);
+    for (final request in adapter.requests) {
+      expect(request.headers['X-App-Version'], '1.2.3+45', reason: request.path);
+      expect(request.headers['X-App-Platform'], 'macos', reason: request.path);
+    }
+  });
+
+  test('without a device identity no version headers are sent', () async {
+    final api = ApiClient(config: config, storage: FakeTokenStorage());
+    final adapter = FakeAdapter((_) => json({'ok': true}, 200));
+    api.dio.httpClientAdapter = adapter;
+
+    await api.dio.get<dynamic>(ApiEndpoints.me);
+
+    expect(adapter.requests.single.headers.containsKey('X-App-Version'), isFalse);
   });
 
   test('401 refreshes the token and replays the request', () async {

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:bookslane_app/core/config/config.dart';
 import 'package:bookslane_app/core/storage/token_storage.dart';
@@ -22,6 +23,7 @@ class AuthInterceptor extends Interceptor {
     required AppConfig config,
     this.onSessionExpired,
     Dio? refreshClient,
+    Map<String, String>? defaultHeaders,
   }) : // A SEPARATE client for the refresh call. Sending it through [client]
        // would run it back through this interceptor, and a failing refresh
        // would then try to refresh itself, forever.
@@ -33,6 +35,9 @@ class AuthInterceptor extends Interceptor {
                connectTimeout: config.connectTimeout,
                receiveTimeout: config.receiveTimeout,
                contentType: Headers.jsonContentType,
+               // Same version/platform headers as the main client, or a
+               // refresh could be refused as an unknown build.
+               headers: defaultHeaders,
              ),
            );
 
@@ -40,6 +45,11 @@ class AuthInterceptor extends Interceptor {
   /// after a refresh, so the new token gets attached on the way back through.
   final Dio client;
   final Dio _refreshClient;
+
+  /// The separate client the refresh call goes through — exposed so a test can
+  /// point it at a fake network.
+  @visibleForTesting
+  Dio get refreshClientForTest => _refreshClient;
   final TokenStorage storage;
 
   /// Fires when the session can no longer be recovered — route to sign-in.

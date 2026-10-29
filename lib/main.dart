@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bookslane_app/core/config/config.dart';
+import 'package:bookslane_app/core/device/device_identity.dart';
 import 'package:bookslane_app/core/network/api_client.dart';
 import 'package:bookslane_app/core/theme/theme.dart';
 import 'package:bookslane_app/features/auth/data/datasources/auth_remote_datasource.dart';
@@ -26,12 +28,26 @@ import 'package:bookslane_app/features/shop/domain/repositories/shop_repository.
 import 'package:bookslane_app/features/products/data/repositories/products_repository_impl.dart';
 import 'package:bookslane_app/features/products/domain/repositories/products_repository.dart';
 
-void main() {
-  runApp(const BooksLane());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Read once before anything talks to the API: the id and version go out with
+  // every request.
+  final device = await DeviceIdentity.load();
+  if (kDebugMode) {
+    // Debug builds only: lets you confirm the id is the same on every launch.
+    debugPrint(
+      'Device: id=${device.deviceId} platform=${device.platform} '
+      'name=${device.deviceName} version=${device.appVersion}',
+    );
+  }
+  runApp(BooksLane(device: device));
 }
 
 class BooksLane extends StatefulWidget {
-  const BooksLane({super.key});
+  const BooksLane({super.key, this.device});
+
+  /// Null only in tests.
+  final DeviceIdentity? device;
 
   @override
   State<BooksLane> createState() => _BooksLaneState();
@@ -58,6 +74,7 @@ class _BooksLaneState extends State<BooksLane> {
     // the provider, and AuthGate swaps to the login screen from wherever the
     // user happened to be.
     _apiClient = ApiClient(
+      device: widget.device,
       onSessionExpired: () => _authProvider.onSessionExpired(),
     );
 

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'package:bookslane_app/core/config/config.dart';
+import 'package:bookslane_app/core/device/device_identity.dart';
 import 'package:bookslane_app/core/network/auth_interceptor.dart';
 import 'package:bookslane_app/core/storage/token_storage.dart';
 
@@ -27,13 +28,15 @@ class ApiClient {
     AppConfig? config,
     TokenStorage? storage,
     void Function()? onSessionExpired,
+    DeviceIdentity? device,
   }) : this._(
          config ?? AppConfig.current,
          storage ?? SecureTokenStorage(),
          onSessionExpired,
+         device,
        );
 
-  ApiClient._(this.config, this.storage, this.onSessionExpired)
+  ApiClient._(this.config, this.storage, this.onSessionExpired, this.device)
     : dio = Dio(
         BaseOptions(
           // apiRoot, not apiBaseUrl: it carries the /v1 version segment the
@@ -43,7 +46,11 @@ class ApiClient {
           receiveTimeout: config.receiveTimeout,
           contentType: Headers.jsonContentType,
           responseType: ResponseType.json,
-          headers: const {'Accept': Headers.jsonContentType},
+          headers: {
+            'Accept': Headers.jsonContentType,
+            // Version and platform on every request (see DeviceIdentity.headers).
+            ...?device?.headers,
+          },
         ),
       ) {
     // Order is execution order: authenticate first, so the log below shows the
@@ -54,6 +61,7 @@ class ApiClient {
         storage: storage,
         config: config,
         onSessionExpired: onSessionExpired,
+        defaultHeaders: device?.headers,
       ),
     );
 
@@ -66,6 +74,9 @@ class ApiClient {
 
   final AppConfig config;
   final Dio dio;
+
+  /// Who this install is; null in tests that don't care.
+  final DeviceIdentity? device;
 
   /// Where the tokens live — the sign-in flow writes them here after a
   /// successful login, and sign-out clears them.

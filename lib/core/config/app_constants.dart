@@ -13,11 +13,15 @@ abstract final class AppConstants {
   static const String accessTokenKey = 'auth.access_token';
   static const String refreshTokenKey = 'auth.refresh_token';
   static const String onboardingSeenKey = 'app.onboarding_seen';
+  static const String deviceIdKey = 'app.device_id';
 
   // ---------------------------------------------------------------------------
   // Networking behaviour
   // ---------------------------------------------------------------------------
   static const String authorizationHeader = 'Authorization';
+  // The server asks an outdated build to update from these (426 UPGRADE_REQUIRED).
+  static const String appVersionHeader = 'X-App-Version';
+  static const String appPlatformHeader = 'X-App-Platform';
   static const String bearerPrefix = 'Bearer ';
   static const int maxRetries = 2;
 
